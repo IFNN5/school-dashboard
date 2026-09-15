@@ -15,7 +15,7 @@ export function initSearch(teachers = []) {
     searchOptions: {
       // ✅ مطابقة تامة: لا fuzzy، لا prefix
       fuzzy: false,
-      prefix: true,
+      prefix: false,
       combineWith: 'AND' // كل الكلمات يجب أن تتطابق
     },
     tokenize: (text) => text.split(/[\s,.\-()]+/).filter(Boolean),

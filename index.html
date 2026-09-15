@@ -7,7 +7,6 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="css/style.css">
-  <!-- ⚠️ Alpine.js لا يُحمَّل من هنا — يتم تحميله ديناميكيًا من app.js -->
 </head>
 <body x-data="app()" x-init="init()" x-cloak>
 
@@ -15,13 +14,15 @@
        الشريط الجانبي
   ============================================================ -->
   <aside class="sidebar">
-    <h2>🏫 لوحة الوكيلة</h2>
+    <h2>لوحة الوكيلة</h2>
     <nav>
-      <button @click="tab='teachers'"   :class="{active: tab==='teachers'}">👩‍🏫 المعلمات</button>
-      <button @click="tab='attendance'" :class="{active: tab==='attendance'}">📋 الحضور</button>
-      <button @click="tab='schedule'"   :class="{active: tab==='schedule'}">📅 الجدول</button>
-      <button @click="tab='visits'"     :class="{active: tab==='visits'}">🔍 الزيارات الصفية</button>
-      <button @click="tab='settings'"   :class="{active: tab==='settings'}">⚙️ الإعدادات</button>
+      <button @click="tab='teachers'"   :class="{active: tab==='teachers'}">المعلمات</button>
+      <button @click="tab='attendance'" :class="{active: tab==='attendance'}">الحضور</button>
+      <button @click="tab='history'"    :class="{active: tab==='history'}">السجل</button>
+      <button @click="tab='reports'"    :class="{active: tab==='reports'}">التقارير</button>
+      <button @click="tab='schedule'"   :class="{active: tab==='schedule'}">الجدول</button>
+      <button @click="tab='visits'"     :class="{active: tab==='visits'}">الزيارات</button>
+      <button @click="tab='settings'"   :class="{active: tab==='settings'}">الإعدادات</button>
     </nav>
   </aside>
 
@@ -30,24 +31,29 @@
   ============================================================ -->
   <main class="content">
 
-    <!-- ============ تبويب: المعلمات ============ -->
+    <!-- ============================================================
+         تبويب: المعلمات
+    ============================================================ -->
     <template x-if="tab==='teachers'">
       <div>
-        <h1>👩‍🏫 المعلمات</h1>
+        <h1>المعلمات</h1>
 
         <div class="search-bar">
           <input type="text"
                  x-model="query"
                  @input="liveSearch()"
-                 placeholder="🔍 ابحث بالاسم أو التخصص أو الهاتف...">
+                 placeholder="ابحث بالاسم أو التخصص أو الهاتف...">
         </div>
 
         <div class="toolbar">
-          <button @click="showAddForm = !showAddForm">➕ إضافة معلمة</button>
-          <button @click="importFile()">📥 استيراد CSV / JSON</button>
-          <button @click="downloadTemplate()">📄 تحميل قالب CSV</button>
-          <button @click="exportData('json')">📤 تصدير JSON</button>
-          <button @click="exportData('csv')">📊 تصدير CSV</button>
+          <button @click="showAddForm = !showAddForm">إضافة معلمة</button>
+          <button @click="importFile()">استيراد CSV / JSON</button>
+          <button @click="downloadTemplate()">تحميل قالب CSV</button>
+          <button @click="exportData('json')">تصدير JSON</button>
+          <button @click="exportData('csv')">تصدير CSV</button>
+          <button class="btn-secondary" @click="toggleShowInactive()">
+            <span x-text="showInactiveTeachers ? 'إخفاء المعطّلات' : 'عرض المعطّلات'"></span>
+          </button>
         </div>
 
         <!-- نموذج الإضافة -->
@@ -75,8 +81,8 @@
               </label>
             </div>
             <div class="form-actions">
-              <button class="btn btn-success" @click="saveNewTeacher(newTeacher)">💾 حفظ</button>
-              <button class="btn btn-secondary" @click="showAddForm=false">✖️ إلغاء</button>
+              <button class="btn-success" @click="saveNewTeacher(newTeacher)">حفظ</button>
+              <button class="btn-secondary" @click="showAddForm=false">إلغاء</button>
             </div>
           </div>
         </template>
@@ -84,7 +90,7 @@
         <!-- نموذج التعديل -->
         <template x-if="showEditForm && editingTeacher">
           <div class="form-panel">
-            <h3>✏️ تعديل بيانات المعلمة</h3>
+            <h3>تعديل بيانات المعلمة</h3>
             <div class="form-grid">
               <label>الاسم الكامل
                 <input type="text" x-model="editingTeacher.name" required>
@@ -104,15 +110,21 @@
               <label>ملاحظات
                 <input type="text" x-model="editingTeacher.notes">
               </label>
+              <label>الحالة
+                <select x-model="editingTeacher.is_active">
+                  <option :value="true">نشطة</option>
+                  <option :value="false">معطّلة</option>
+                </select>
+              </label>
             </div>
             <div class="form-actions">
-              <button class="btn btn-success" @click="saveEditTeacher()">💾 حفظ التعديل</button>
-              <button class="btn btn-secondary" @click="cancelEdit()">✖️ إلغاء</button>
+              <button class="btn-success" @click="saveEditTeacher()">حفظ التعديل</button>
+              <button class="btn-secondary" @click="cancelEdit()">إلغاء</button>
             </div>
           </div>
         </template>
 
-        <!-- الجدول -->
+        <!-- جدول المعلمات -->
         <template x-if="filteredTeachers.length > 0">
           <table>
             <thead>
@@ -121,19 +133,27 @@
                 <th>التخصص</th>
                 <th>الهاتف</th>
                 <th>البريد</th>
+                <th>الحالة</th>
                 <th>إجراءات</th>
               </tr>
             </thead>
             <tbody>
               <template x-for="t in filteredTeachers" :key="t.id">
-                <tr>
+                <tr :class="{inactive: !t.is_active}">
                   <td x-text="t.name"></td>
                   <td x-text="t.specialty || '—'"></td>
                   <td x-text="t.phone || '—'"></td>
                   <td x-text="t.email || '—'"></td>
                   <td>
-                    <button title="تعديل" @click="openEditForm(t)">✏️</button>
-                    <button title="حذف" @click="deleteTeacher(t.id)">🗑️</button>
+                    <span class="badge" :class="t.is_active ? 'badge-success' : 'badge-muted'"
+                          x-text="t.is_active ? 'نشطة' : 'معطّلة'"></span>
+                  </td>
+                  <td>
+                    <button title="تعديل" @click="openEditForm(t)">تعديل</button>
+                    <button title="تفعيل/تعطيل" @click="toggleTeacherActive(t.id)">
+                      <span x-text="t.is_active ? 'تعطيل' : 'تفعيل'"></span>
+                    </button>
+                    <button title="حذف" @click="deleteTeacher(t.id)">حذف</button>
                   </td>
                 </tr>
               </template>
@@ -149,37 +169,350 @@
       </div>
     </template>
 
-    <!-- ============ تبويب: الحضور ============ -->
+    <!-- ============================================================
+         تبويب: الحضور (تسجيل جماعي)
+    ============================================================ -->
     <template x-if="tab==='attendance'">
       <div>
-        <h1>📋 الحضور والغياب</h1>
-        <div class="empty"><p>سيتم إضافة وحدة تسجيل الحضور هنا</p></div>
+        <h1>تسجيل الحضور اليومي</h1>
+
+        <!-- شريط التاريخ -->
+        <div class="date-bar">
+          <button class="btn-secondary" @click="navigateDay(-1)">اليوم السابق</button>
+          <div class="date-display">
+            <div class="date-hijri" x-text="attendanceDateLabel"></div>
+            <div class="date-gregorian" x-text="attendanceDateGregorian + ' م'"></div>
+          </div>
+          <button class="btn-secondary" @click="goToToday()">اليوم</button>
+          <button class="btn-secondary" @click="navigateDay(1)">اليوم التالي</button>
+        </div>
+
+        <!-- تنبيه الإجازة -->
+        <template x-if="isHoliday">
+          <div class="alert alert-info">
+            <span>هذا اليوم مُعيَّن كإجازة: <strong x-text="holidayName"></strong></span>
+            <button class="btn-secondary" @click="toggleHoliday()">إلغاء الإجازة</button>
+          </div>
+        </template>
+
+        <!-- أزرار التحكم -->
+        <div class="toolbar">
+          <button @click="setAllPresent()">تعيين الباقي كحاضرة</button>
+          <button @click="saveDay()">حفظ التسجيل</button>
+          <button class="btn-secondary" @click="clearDayUI()">مسح الواجهة</button>
+          <button class="btn-secondary" @click="deleteDayFromDB()">حذف سجلات اليوم</button>
+          <button class="btn-secondary" @click="toggleHoliday()">
+            <span x-text="isHoliday ? 'إلغاء الإجازة' : 'تعيين كإجازة'"></span>
+          </button>
+          <button class="btn-secondary" @click="exportDailyReport()">تقرير اليوم PDF</button>
+        </div>
+
+        <!-- بطاقات الإحصائيات -->
+        <div class="stats-cards">
+          <div class="stat-card">
+            <div class="stat-value" x-text="dashboardStats.todayPresent"></div>
+            <div class="stat-label">حاضرة</div>
+          </div>
+          <div class="stat-card stat-warning">
+            <div class="stat-value" x-text="dashboardStats.todayLate"></div>
+            <div class="stat-label">متأخرة</div>
+          </div>
+          <div class="stat-card stat-info">
+            <div class="stat-value" x-text="dashboardStats.todayExcused"></div>
+            <div class="stat-label">استئذان</div>
+          </div>
+          <div class="stat-card stat-danger">
+            <div class="stat-value" x-text="dashboardStats.todayAbsent"></div>
+            <div class="stat-label">غياب</div>
+          </div>
+          <div class="stat-card stat-muted">
+            <div class="stat-value" x-text="dashboardStats.todayNotRecorded"></div>
+            <div class="stat-label">لم يُسجَّل</div>
+          </div>
+        </div>
+
+        <!-- جدول التسجيل الجماعي -->
+        <template x-if="roster.length > 0">
+          <div class="attendance-table-wrapper">
+            <table class="attendance-table">
+              <thead>
+                <tr>
+                  <th style="width:22%">المعلمة</th>
+                  <th style="width:10%">التخصص</th>
+                  <th style="width:38%">الحالة</th>
+                  <th style="width:12%">الوقت</th>
+                  <th style="width:18%">ملاحظة</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="item in roster" :key="item.teacher.id">
+                  <tr :class="{'row-recorded': item.status}">
+                    <td class="teacher-name" x-text="item.teacher.name"></td>
+                    <td class="teacher-specialty" x-text="item.teacher.specialty || '—'"></td>
+                    <td>
+                      <div class="status-buttons">
+                        <template x-for="st in statusList" :key="st.key">
+                          <button class="status-btn"
+                                  :class="{'status-active': item.status === st.key}"
+                                  :style="item.status === st.key ? 'background:' + st.color + '; color:#fff; border-color:' + st.color : ''"
+                                  @click="setStatus(item.teacher.id, st.key)"
+                                  x-text="st.label"></button>
+                        </template>
+                      </div>
+                    </td>
+                    <td>
+                      <template x-if="item.status === 'late' || item.status === 'excused'">
+                        <input type="time"
+                               class="time-input"
+                               :value="item.time"
+                               @input="setTime(item.teacher.id, $event.target.value)">
+                      </template>
+                      <template x-if="item.status !== 'late' && item.status !== 'excused'">
+                        <span class="muted">—</span>
+                      </template>
+                    </td>
+                    <td>
+                      <input type="text"
+                             class="note-input"
+                             placeholder="ملاحظة..."
+                             :value="item.note"
+                             @input="setNote(item.teacher.id, $event.target.value)">
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </template>
+
+        <template x-if="roster.length === 0">
+          <div class="empty">
+            <p>لا توجد معلمات نشطات — أضيفي معلمات أولاً</p>
+          </div>
+        </template>
       </div>
     </template>
 
-    <!-- ============ تبويب: الجدول ============ -->
+    <!-- ============================================================
+         تبويب: السجل
+    ============================================================ -->
+    <template x-if="tab==='history'">
+      <div>
+        <h1>سجل الحضور والغياب</h1>
+
+        <!-- الفلاتر -->
+        <div class="filters-panel">
+          <div class="filter-grid">
+            <label>من تاريخ
+              <input type="date" x-model="historyFilters.from">
+            </label>
+            <label>إلى تاريخ
+              <input type="date" x-model="historyFilters.to">
+            </label>
+            <label>المعلمة
+              <select x-model="historyFilters.teacher_id">
+                <option value="">الكل</option>
+                <template x-for="t in teachers" :key="t.id">
+                  <option :value="t.id" x-text="t.name"></option>
+                </template>
+              </select>
+            </label>
+            <label>الحالة
+              <select x-model="historyFilters.status">
+                <option value="">الكل</option>
+                <template x-for="st in statusList" :key="st.key">
+                  <option :value="st.key" x-text="st.label"></option>
+                </template>
+              </select>
+            </label>
+          </div>
+          <div class="form-actions">
+            <button @click="loadHistory()">بحث</button>
+            <button class="btn-secondary" @click="clearHistoryFilters()">مسح الفلاتر</button>
+            <button class="btn-secondary" @click="exportHistoryReport()">تصدير PDF</button>
+          </div>
+        </div>
+
+        <!-- الجدول -->
+        <template x-if="historyLoading">
+          <div class="empty"><p>جاري التحميل...</p></div>
+        </template>
+
+        <template x-if="!historyLoading && historyRecords.length > 0">
+          <table>
+            <thead>
+              <tr>
+                <th>التاريخ الهجري</th>
+                <th>المعلمة</th>
+                <th>التخصص</th>
+                <th>الحالة</th>
+                <th>الوقت</th>
+                <th>ملاحظة</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="r in historyRecords" :key="r.id">
+                <tr>
+                  <td x-text="formatRecordDate(r.date_hijri)"></td>
+                  <td x-text="r.teacher_name"></td>
+                  <td x-text="r.teacher_specialty || '—'"></td>
+                  <td>
+                    <span class="badge" :style="'background:' + getStatusColor(r.status)"
+                          x-text="getStatusLabel(r.status)"></span>
+                  </td>
+                  <td x-text="r.time || '—'"></td>
+                  <td x-text="r.note || '—'"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </template>
+
+        <template x-if="!historyLoading && historyRecords.length === 0">
+          <div class="empty">
+            <p>لا توجد سجلات — حدّدي الفلاتر واضغطي "بحث"</p>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- ============================================================
+         تبويب: التقارير
+    ============================================================ -->
+    <template x-if="tab==='reports'">
+      <div>
+        <h1>التقارير</h1>
+
+        <!-- تبويبات داخلية -->
+        <div class="report-tabs">
+          <button :class="{active: reportTab==='daily'}"    @click="reportTab='daily'">تقرير يومي</button>
+          <button :class="{active: reportTab==='teacher'}"  @click="reportTab='teacher'">تقرير معلمة</button>
+          <button :class="{active: reportTab==='general'}"  @click="reportTab='general'">التقرير العام</button>
+          <button :class="{active: reportTab==='history'}"  @click="reportTab='history'">تقرير السجل</button>
+          <button :class="{active: reportTab==='holidays'}" @click="reportTab='holidays'">تقرير الإجازات</button>
+        </div>
+
+        <!-- تقرير يومي -->
+        <template x-if="reportTab==='daily'">
+          <div class="settings-panel">
+            <h3>تقرير الحضور اليومي</h3>
+            <p class="muted">يولّد تقريراً بكل المعلمات مع حالاتهنّ في اليوم المحدد.</p>
+            <p>اليوم المحدد: <strong x-text="attendanceDateLabel"></strong></p>
+            <div class="toolbar">
+              <button @click="exportDailyReport()">توليد PDF</button>
+            </div>
+          </div>
+        </template>
+
+        <!-- تقرير معلمة -->
+        <template x-if="reportTab==='teacher'">
+          <div class="settings-panel">
+            <h3>تقرير أداء معلمة</h3>
+            <div class="filter-grid">
+              <label>المعلمة
+                <select x-model="reportTeacher.id">
+                  <option value="">اختاري معلمة</option>
+                  <template x-for="t in teachers" :key="t.id">
+                    <option :value="t.id" x-text="t.name"></option>
+                  </template>
+                </select>
+              </label>
+              <label>من تاريخ
+                <input type="date" x-model="reportRange.from">
+              </label>
+              <label>إلى تاريخ
+                <input type="date" x-model="reportRange.to">
+              </label>
+            </div>
+            <div class="toolbar">
+              <button @click="exportTeacherReport()">توليد PDF</button>
+              <button class="btn-secondary" @click="setCurrentMonthRange()">الشهر الحالي</button>
+            </div>
+          </div>
+        </template>
+
+        <!-- التقرير العام -->
+        <template x-if="reportTab==='general'">
+          <div class="settings-panel">
+            <h3>التقرير العام</h3>
+            <p class="muted">ترتيب المعلمات حسب الأكثر غياباً وتأخراً في الفترة المحددة.</p>
+            <div class="filter-grid">
+              <label>من تاريخ
+                <input type="date" x-model="reportRange.from">
+              </label>
+              <label>إلى تاريخ
+                <input type="date" x-model="reportRange.to">
+              </label>
+            </div>
+            <div class="toolbar">
+              <button @click="exportGeneralReport()">توليد PDF</button>
+              <button class="btn-secondary" @click="setCurrentMonthRange()">الشهر الحالي</button>
+            </div>
+          </div>
+        </template>
+
+        <!-- تقرير السجل -->
+        <template x-if="reportTab==='history'">
+          <div class="settings-panel">
+            <h3>تقرير السجل</h3>
+            <p class="muted">يولّد PDF بناءً على الفلاتر المحددة في تبويب "السجل".</p>
+            <div class="toolbar">
+              <button @click="exportHistoryReport()">توليد PDF</button>
+              <button class="btn-secondary" @click="tab='history'">الانتقال للسجل</button>
+            </div>
+          </div>
+        </template>
+
+        <!-- تقرير الإجازات -->
+        <template x-if="reportTab==='holidays'">
+          <div class="settings-panel">
+            <h3>تقرير الإجازات</h3>
+            <p class="muted">قائمة بكل الإجازات المُعيَّنة خلال الفترة.</p>
+            <div class="filter-grid">
+              <label>من تاريخ
+                <input type="date" x-model="reportRange.from">
+              </label>
+              <label>إلى تاريخ
+                <input type="date" x-model="reportRange.to">
+              </label>
+            </div>
+            <div class="toolbar">
+              <button @click="exportHolidaysReport()">توليد PDF</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- ============================================================
+         تبويب: الجدول (مؤقت)
+    ============================================================ -->
     <template x-if="tab==='schedule'">
       <div>
-        <h1>📅 الجدول الدراسي</h1>
-        <div class="empty"><p>سيتم إضافة بناء الجدول وتوزيع الحصص هنا</p></div>
+        <h1>الجدول الدراسي</h1>
+        <div class="empty"><p>سيتم إضافة وحدة الجدول الدراسي هنا</p></div>
       </div>
     </template>
 
-    <!-- ============ تبويب: الزيارات ============ -->
+    <!-- ============================================================
+         تبويب: الزيارات (مؤقت)
+    ============================================================ -->
     <template x-if="tab==='visits'">
       <div>
-        <h1>🔍 الزيارات الصفية</h1>
-        <div class="empty"><p>سيتم إضافة جدولة الزيارات ونماذج الملاحظات هنا</p></div>
+        <h1>الزيارات الصفية</h1>
+        <div class="empty"><p>سيتم إضافة وحدة الزيارات الصفية هنا</p></div>
       </div>
     </template>
 
-    <!-- ============ تبويب: الإعدادات ============ -->
+    <!-- ============================================================
+         تبويب: الإعدادات
+    ============================================================ -->
     <template x-if="tab==='settings'">
       <div>
-        <h1>⚙️ الإعدادات</h1>
+        <h1>الإعدادات</h1>
 
         <div class="settings-panel">
-          <h3>🎨 تخصيص الألوان</h3>
+          <h3>تخصيص الألوان</h3>
           <label>
             <span>اللون الأساسي</span>
             <input type="color" x-model="theme.primary" @input="applyTheme()">
@@ -203,11 +536,10 @@
         </div>
 
         <div class="settings-panel" style="margin-top:20px;">
-          <h3>✍️ الخط والحواف</h3>
+          <h3>الخط والحواف</h3>
           <label>
             <span>نوع الخط</span>
-            <select x-model="theme.font" @change="applyTheme()"
-                    style="padding:8px 12px; border:1px solid var(--border); border-radius:6px; background:var(--bg); color:var(--text); font-family:inherit;">
+            <select x-model="theme.font" @change="applyTheme()">
               <template x-for="f in availableFonts" :key="f.value">
                 <option :value="f.value" x-text="f.label"></option>
               </template>
@@ -224,25 +556,25 @@
 
         <div class="settings-panel" style="margin-top:20px;">
           <div class="toolbar">
-            <button @click="saveTheme()">💾 حفظ التخصيص</button>
-            <button class="btn btn-secondary" @click="resetTheme()">🔄 استعادة الافتراضي</button>
-            <button class="btn btn-secondary" @click="exportTheme()">📤 تصدير الإعدادات</button>
-            <button class="btn btn-secondary" @click="importTheme()">📥 استيراد الإعدادات</button>
+            <button @click="saveTheme()">حفظ التخصيص</button>
+            <button class="btn-secondary" @click="resetTheme()">استعادة الافتراضي</button>
+            <button class="btn-secondary" @click="exportTheme()">تصدير الإعدادات</button>
+            <button class="btn-secondary" @click="importTheme()">استيراد الإعدادات</button>
           </div>
         </div>
 
         <div class="settings-panel" style="margin-top:20px;">
-          <h3>💾 النسخ الاحتياطي للبيانات</h3>
+          <h3>النسخ الاحتياطي للبيانات</h3>
           <div class="toolbar">
-            <button @click="exportData('json')">📤 تصدير كل البيانات</button>
-            <button @click="importBackup()">📥 استيراد نسخة احتياطية</button>
+            <button @click="exportData('json')">تصدير كل البيانات</button>
+            <button @click="importBackup()">استيراد نسخة احتياطية</button>
           </div>
         </div>
 
         <div class="settings-panel" style="margin-top:20px;">
-          <h3>ℹ️ معلومات النظام</h3>
+          <h3>معلومات النظام</h3>
           <label>
-            <span>عدد المعلمات</span>
+            <span>عدد المعلمات النشطات</span>
             <span x-text="stats.total" style="font-weight:600;"></span>
           </label>
           <label>
@@ -255,15 +587,12 @@
 
   </main>
 
-  <!-- ============ رسالة التنبيه ============ -->
+  <!-- ============ Toast ============ -->
   <template x-if="toast">
     <div class="toast" x-text="toast"></div>
   </template>
 
-  <!-- ============================================================
-       ⚠️ Alpine.js يُحمَّل ديناميكيًا من داخل app.js
-       لا نضعه هنا لتفادي سباق التحميل
-  ============================================================ -->
+  <!-- Alpine.js يُحمَّل ديناميكياً من داخل app.js -->
   <script type="module" src="js/app.js"></script>
 
 </body>

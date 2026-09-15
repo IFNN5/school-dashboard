@@ -4,8 +4,8 @@
 // ============================================================
 
 // ⚠️ مهم: عند أي تعديل على ملفات التطبيق، غيّري رقم الإصدار
-//         من v2 إلى v3 مثلاً، ليتم إعادة تحميل الكاش الجديد
-const CACHE_NAME = 'school-dashboard-v2';
+//         من v4 إلى v5 مثلاً، ليتم إعادة تحميل الكاش الجديد
+const CACHE_NAME = 'school-dashboard-v4';
 
 // قائمة الملفات التي سيتم تخزينها في الكاش
 const ASSETS_TO_CACHE = [
@@ -19,6 +19,8 @@ const ASSETS_TO_CACHE = [
   './js/import.js',
   './js/theme.js',
   './js/export.js',
+  './js/hijri.js',
+  './js/attendance.js',
   './icons/icon-192.png'
 ];
 
@@ -40,7 +42,7 @@ self.addEventListener('install', (event) => {
 
 // ============================================================
 //  حدث Activate — يتم تشغيله عند تنشيط Service Worker جديد
-//  نحذف الكاشات القديمة (v1، v0، إلخ)
+//  نحذف الكاشات القديمة (v1، v2، v3، إلخ)
 // ============================================================
 self.addEventListener('activate', (event) => {
   console.log('✅ Service Worker: Activating...');
@@ -66,7 +68,7 @@ self.addEventListener('fetch', (event) => {
   // نتجاهل الطلبات غير GET (مثل POST)
   if (event.request.method !== 'GET') return;
 
-  // نتجاهل الطلبات من نطاقات خارجية (مثل CDN) — نتركها للشبكة
+  // نتجاهل الطلبات من نطاقات خارجية (مثل CDN)
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) {
     return;

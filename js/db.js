@@ -1,6 +1,7 @@
 // ============================================================
 //  db.js — طبقة قاعدة البيانات (PGlite)
-//  تعمل بالكامل داخل المتصفح، وتخزّن البيانات في IndexedDB
+//  - تعمل بالكامل داخل المتصفح، وتخزّن البيانات في IndexedDB
+//  - تشمل: المعلمات، الحضور، الأيام الدراسية
 // ============================================================
 
 import { PGlite } from 'https://cdn.jsdelivr.net/npm/@electric-sql/pglite/dist/index.js';
@@ -11,19 +12,41 @@ import { PGlite } from 'https://cdn.jsdelivr.net/npm/@electric-sql/pglite/dist/i
 let db = null;
 
 // ============================================================
+//  حالات الحضور السبع
+//  مفتاح موحد لكل حالة + الترجمة العربية
+// ============================================================
+export const ATTENDANCE_STATUSES = {
+  present:          'حاضرة',
+  late:             'متأخرة',
+  excused:          'استئذان',
+  sick_leave:       'إجازة مرضية',
+  absent:           'غياب بدون عذر',
+  official_leave:   'إجازة رسمية',
+  official_mission: 'مهمة رسمية'
+};
+
+// ============================================================
+//  الحالات التي تُحتاج إلى وقت (HH:MM)
+// ============================================================
+export const STATUSES_NEEDING_TIME = ['late', 'excused'];
+
+// ============================================================
+//  الحالات التي تُحسب كغياب
+// ============================================================
+export const STATUSES_COUNTING_AS_ABSENCE = ['sick_leave', 'absent'];
+
+// ============================================================
+//  الحالات التي تُحسب كغياب بعذر
+// ============================================================
+export const STATUSES_WITH_EXCUSE = ['sick_leave', 'excused', 'official_leave', 'official_mission'];
+
+// ============================================================
 //  تهيئة قاعدة البيانات
-//  - تنشئ الجداول إن لم تكن موجودة
-//  - تخزّن البيانات في IndexedDB (idb://)
-//  - تُستدعى مرة واحدة عند بدء التطبيق
 // ============================================================
 export async function initDB() {
-  if (db) return db; // إذا كانت مهيأة مسبقًا، أرجعها
+  if (db) return db;
 
-  // idb://school-dashboard يعني: خزّن قاعدة البيانات في IndexedDB
-  // باسم "school-dashboard" — يبقى محفوظًا بعد إغلاق المتصفح
   db = new PGlite('idb://school-dashboard');
-
-  // انتظر حتى تنتهي PGlite من تهيئة نفسها
   await db.waitReady;
 
   // --------------------------------------------------------
@@ -38,46 +61,96 @@ export async function initDB() {
       email TEXT,
       hire_date TEXT,
       notes TEXT,
+      is_active BOOLEAN DEFAULT true,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
+  // إضافة عمود is_active إذا كان الجدول موجوداً مسبقاً بدونه
+  await db.exec(`
+    ALTER TABLE teachers ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+  `);
+
   // --------------------------------------------------------
-  //  جدول الحضور (جاهز للمرحلة القادمة)
+  //  جدول الحضور
   // --------------------------------------------------------
   await db.exec(`
     CREATE TABLE IF NOT EXISTS attendance (
       id SERIAL PRIMARY KEY,
       teacher_id INTEGER REFERENCES teachers(id) ON DELETE CASCADE,
-      date TEXT NOT NULL,
+      date_hijri TEXT NOT NULL,
+      date_gregorian TEXT NOT NULL,
       status TEXT NOT NULL,
+      time TEXT,
       note TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(teacher_id, date_hijri)
+    );
+  `);
+
+  // فهارس لتسريع الاستعلامات
+  await db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(date_hijri);
+  `);
+  await db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_attendance_teacher ON attendance(teacher_id);
+  `);
+  await db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_attendance_status ON attendance(status);
+  `);
+
+  // --------------------------------------------------------
+  //  جدول الأيام الدراسية
+  // --------------------------------------------------------
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS academic_days (
+      id SERIAL PRIMARY KEY,
+      date_hijri TEXT UNIQUE NOT NULL,
+      date_gregorian TEXT NOT NULL,
+      is_holiday BOOLEAN DEFAULT false,
+      holiday_name TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
-  console.log('✅ Database ready');
+  await db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_academic_date ON academic_days(date_hijri);
+  `);
+
+  console.log('✅ Database ready (teachers + attendance + academic_days)');
   return db;
 }
 
 // ============================================================
-//  جلب كل المعلمات مرتبةً بالاسم
+//  ============ قسم المعلمات ============
 // ============================================================
-export async function getAllTeachers() {
-  const result = await db.query(
-    'SELECT * FROM teachers ORDER BY name ASC'
-  );
+
+// ============================================================
+//  جلب كل المعلمات النشطات (أو الكل)
+// ============================================================
+export async function getAllTeachers(includeInactive = false) {
+  const sql = includeInactive
+    ? 'SELECT * FROM teachers ORDER BY name ASC'
+    : 'SELECT * FROM teachers WHERE is_active = true ORDER BY name ASC';
+  const result = await db.query(sql);
   return result.rows;
 }
 
 // ============================================================
+//  جلب معلمة واحدة
+// ============================================================
+export async function getTeacher(id) {
+  const result = await db.query('SELECT * FROM teachers WHERE id = $1', [id]);
+  return result.rows[0] || null;
+}
+
+// ============================================================
 //  إضافة معلمة جديدة
-//  @returns {Object} السجل الجديد بعد الإضافة
 // ============================================================
 export async function addTeacher(teacher) {
   const result = await db.query(
-    `INSERT INTO teachers (name, specialty, phone, email, hire_date, notes)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO teachers (name, specialty, phone, email, hire_date, notes, is_active)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING *`,
     [
       teacher.name,
@@ -85,14 +158,15 @@ export async function addTeacher(teacher) {
       teacher.phone || null,
       teacher.email || null,
       teacher.hire_date || null,
-      teacher.notes || null
+      teacher.notes || null,
+      teacher.is_active !== false
     ]
   );
   return result.rows[0];
 }
 
 // ============================================================
-//  تحديث بيانات معلمة
+//  تحديث معلمة
 // ============================================================
 export async function updateTeacher(id, teacher) {
   const result = await db.query(
@@ -102,8 +176,9 @@ export async function updateTeacher(id, teacher) {
          phone = $3,
          email = $4,
          hire_date = $5,
-         notes = $6
-     WHERE id = $7
+         notes = $6,
+         is_active = $7
+     WHERE id = $8
      RETURNING *`,
     [
       teacher.name,
@@ -112,6 +187,7 @@ export async function updateTeacher(id, teacher) {
       teacher.email || null,
       teacher.hire_date || null,
       teacher.notes || null,
+      teacher.is_active !== false,
       id
     ]
   );
@@ -119,17 +195,25 @@ export async function updateTeacher(id, teacher) {
 }
 
 // ============================================================
-//  حذف معلمة
+//  حذف معلمة (نهائي)
 // ============================================================
 export async function deleteTeacher(id) {
   await db.query('DELETE FROM teachers WHERE id = $1', [id]);
 }
 
 // ============================================================
-//  إدخال مجموعة معلمات دفعة واحدة (استيراد جماعي)
-//  نستخدم transaction لضمان:
-//  - إذا فشل أي سجل، لا يُحفظ أي شيء (Atomicity)
-//  - سرعة عالية جدًا عند الإدخال الجماعي
+//  تعطيل/تفعيل معلمة (بدل الحذف)
+// ============================================================
+export async function toggleTeacherActive(id, isActive) {
+  const result = await db.query(
+    'UPDATE teachers SET is_active = $1 WHERE id = $2 RETURNING *',
+    [isActive, id]
+  );
+  return result.rows[0];
+}
+
+// ============================================================
+//  إدخال جماعي للمعلمات (transaction)
 // ============================================================
 export async function bulkInsertTeachers(teachers) {
   if (!teachers || teachers.length === 0) return 0;
@@ -138,19 +222,19 @@ export async function bulkInsertTeachers(teachers) {
 
   await db.transaction(async (tx) => {
     for (const t of teachers) {
-      // تجاهل السجل إن لم يحتوي على اسم
       if (!t.name || t.name.trim() === '') continue;
 
       await tx.query(
-        `INSERT INTO teachers (name, specialty, phone, email, hire_date, notes)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+        `INSERT INTO teachers (name, specialty, phone, email, hire_date, notes, is_active)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
           t.name.trim(),
           t.specialty || null,
           t.phone || null,
           t.email || null,
           t.hire_date || null,
-          t.notes || null
+          t.notes || null,
+          true
         ]
       );
       inserted++;
@@ -161,22 +245,281 @@ export async function bulkInsertTeachers(teachers) {
 }
 
 // ============================================================
-//  عدد المعلمات الكلي
+//  عدد المعلمات
 // ============================================================
-export async function countTeachers() {
-  const result = await db.query('SELECT COUNT(*) as total FROM teachers');
+export async function countTeachers(onlyActive = true) {
+  const sql = onlyActive
+    ? 'SELECT COUNT(*) as total FROM teachers WHERE is_active = true'
+    : 'SELECT COUNT(*) as total FROM teachers';
+  const result = await db.query(sql);
   return parseInt(result.rows[0].total, 10);
 }
 
 // ============================================================
-//  حذف كل البيانات (استخدام بحذر — من الإعدادات)
+//  ============ قسم الحضور ============
 // ============================================================
-export async function deleteAllTeachers() {
-  await db.query('DELETE FROM teachers');
+
+// ============================================================
+//  جلب حضور يوم معين (بالهجري)
+//  @returns {Array} سجلات الحضور لذلك اليوم
+// ============================================================
+export async function getAttendanceByDate(dateHijri) {
+  const result = await db.query(
+    `SELECT a.*, t.name as teacher_name, t.specialty as teacher_specialty
+     FROM attendance a
+     JOIN teachers t ON t.id = a.teacher_id
+     WHERE a.date_hijri = $1
+     ORDER BY t.name ASC`,
+    [dateHijri]
+  );
+  return result.rows;
 }
 
 // ============================================================
-//  إغلاق قاعدة البيانات (اختياري — عند إغلاق التطبيق)
+//  حفظ تسجيل جماعي للحضور (transaction)
+//  @param {Array} records — [{ teacher_id, date_hijri, date_gregorian, status, time, note }]
+//  - يستخدم UPSERT: إذا وُجد السجل لنفس المعلمة واليوم، يحدّثه
+// ============================================================
+export async function saveAttendanceBulk(records) {
+  if (!records || records.length === 0) return 0;
+
+  let saved = 0;
+
+  await db.transaction(async (tx) => {
+    for (const r of records) {
+      if (!r.teacher_id || !r.date_hijri || !r.status) continue;
+
+      await tx.query(
+        `INSERT INTO attendance (teacher_id, date_hijri, date_gregorian, status, time, note)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (teacher_id, date_hijri)
+         DO UPDATE SET
+           status = EXCLUDED.status,
+           time = EXCLUDED.time,
+           note = EXCLUDED.note,
+           date_gregorian = EXCLUDED.date_gregorian`,
+        [
+          r.teacher_id,
+          r.date_hijri,
+          r.date_gregorian,
+          r.status,
+          r.time || null,
+          r.note || null
+        ]
+      );
+      saved++;
+    }
+  });
+
+  return saved;
+}
+
+// ============================================================
+//  حذف تسجيل حضور معلمة في يوم معين
+// ============================================================
+export async function deleteAttendance(teacherId, dateHijri) {
+  await db.query(
+    'DELETE FROM attendance WHERE teacher_id = $1 AND date_hijri = $2',
+    [teacherId, dateHijri]
+  );
+}
+
+// ============================================================
+//  حذف كل حضور يوم معين
+// ============================================================
+export async function deleteAttendanceByDate(dateHijri) {
+  await db.query('DELETE FROM attendance WHERE date_hijri = $1', [dateHijri]);
+}
+
+// ============================================================
+//  جلب سجل الحضور مع فلترة
+//  @param {Object} filters — { from, to, teacher_id, status }
+//  @returns {Array}
+// ============================================================
+export async function getAttendanceHistory(filters = {}) {
+  const conditions = [];
+  const params = [];
+  let idx = 1;
+
+  if (filters.from) {
+    conditions.push(`a.date_hijri >= $${idx++}`);
+    params.push(filters.from);
+  }
+  if (filters.to) {
+    conditions.push(`a.date_hijri <= $${idx++}`);
+    params.push(filters.to);
+  }
+  if (filters.teacher_id) {
+    conditions.push(`a.teacher_id = $${idx++}`);
+    params.push(filters.teacher_id);
+  }
+  if (filters.status) {
+    conditions.push(`a.status = $${idx++}`);
+    params.push(filters.status);
+  }
+
+  const where = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+
+  const result = await db.query(
+    `SELECT a.*, t.name as teacher_name, t.specialty as teacher_specialty
+     FROM attendance a
+     JOIN teachers t ON t.id = a.teacher_id
+     ${where}
+     ORDER BY a.date_hijri DESC, t.name ASC
+     LIMIT 1000`,
+    params
+  );
+  return result.rows;
+}
+
+// ============================================================
+//  إحصائيات معلمة خلال فترة
+//  @returns {Object} { present, late, excused, sick_leave, absent, official_leave, official_mission, total }
+// ============================================================
+export async function getTeacherStats(teacherId, fromDateHijri, toDateHijri) {
+  const result = await db.query(
+    `SELECT status, COUNT(*) as count
+     FROM attendance
+     WHERE teacher_id = $1 AND date_hijri >= $2 AND date_hijri <= $3
+     GROUP BY status`,
+    [teacherId, fromDateHijri, toDateHijri]
+  );
+
+  const stats = {
+    present: 0, late: 0, excused: 0,
+    sick_leave: 0, absent: 0,
+    official_leave: 0, official_mission: 0,
+    total: 0
+  };
+
+  result.rows.forEach(row => {
+    stats[row.status] = parseInt(row.count, 10);
+    stats.total += parseInt(row.count, 10);
+  });
+
+  return stats;
+}
+
+// ============================================================
+//  إحصائيات عامة خلال فترة
+// ============================================================
+export async function getGeneralStats(fromDateHijri, toDateHijri) {
+  const result = await db.query(
+    `SELECT status, COUNT(*) as count
+     FROM attendance
+     WHERE date_hijri >= $1 AND date_hijri <= $2
+     GROUP BY status`,
+    [fromDateHijri, toDateHijri]
+  );
+
+  const stats = {
+    present: 0, late: 0, excused: 0,
+    sick_leave: 0, absent: 0,
+    official_leave: 0, official_mission: 0,
+    total: 0
+  };
+
+  result.rows.forEach(row => {
+    stats[row.status] = parseInt(row.count, 10);
+    stats.total += parseInt(row.count, 10);
+  });
+
+  return stats;
+}
+
+// ============================================================
+//  ترتيب المعلمات حسب الأكثر غياباً
+//  @returns {Array} [{ teacher_id, teacher_name, absences, lates, ... }]
+// ============================================================
+export async function getTeachersRankedByAbsence(fromDateHijri, toDateHijri) {
+  const result = await db.query(
+    `SELECT
+       t.id as teacher_id,
+       t.name as teacher_name,
+       t.specialty as teacher_specialty,
+       COUNT(CASE WHEN a.status = 'absent' THEN 1 END) as absences,
+       COUNT(CASE WHEN a.status = 'sick_leave' THEN 1 END) as sick_leaves,
+       COUNT(CASE WHEN a.status = 'late' THEN 1 END) as lates,
+       COUNT(CASE WHEN a.status = 'excused' THEN 1 END) as excused,
+       COUNT(CASE WHEN a.status IN ('absent','sick_leave') THEN 1 END) as total_absences,
+       COUNT(a.id) as total_records
+     FROM teachers t
+     LEFT JOIN attendance a
+       ON a.teacher_id = t.id
+       AND a.date_hijri >= $1
+       AND a.date_hijri <= $2
+     WHERE t.is_active = true
+     GROUP BY t.id, t.name, t.specialty
+     ORDER BY total_absences DESC, lates DESC, t.name ASC`,
+    [fromDateHijri, toDateHijri]
+  );
+  return result.rows;
+}
+
+// ============================================================
+//  ============ قسم الأيام الدراسية ============
+// ============================================================
+
+// ============================================================
+//  تعيين يوم كإجازة أو عكسها
+//  @param {string} dateHijri — التاريخ الهجري (YYYY-MM-DD)
+//  @param {string} dateGregorian — التاريخ الميلادي (YYYY-MM-DD)
+//  @param {boolean} isHoliday — هل هو إجازة؟
+//  @param {string} holidayName — اسم الإجازة (اختياري)
+// ============================================================
+export async function setHoliday(dateHijri, dateGregorian, isHoliday, holidayName = null) {
+  const result = await db.query(
+    `INSERT INTO academic_days (date_hijri, date_gregorian, is_holiday, holiday_name)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (date_hijri)
+     DO UPDATE SET
+       is_holiday = EXCLUDED.is_holiday,
+       holiday_name = EXCLUDED.holiday_name,
+       date_gregorian = EXCLUDED.date_gregorian
+     RETURNING *`,
+    [dateHijri, dateGregorian, isHoliday, holidayName]
+  );
+  return result.rows[0];
+}
+
+// ============================================================
+//  جلب حالة يوم معين (هل إجازة؟)
+// ============================================================
+export async function getDayStatus(dateHijri) {
+  const result = await db.query(
+    'SELECT * FROM academic_days WHERE date_hijri = $1',
+    [dateHijri]
+  );
+  return result.rows[0] || null;
+}
+
+// ============================================================
+//  جلب كل الإجازات في فترة
+// ============================================================
+export async function getHolidays(fromDateHijri, toDateHijri) {
+  const result = await db.query(
+    `SELECT * FROM academic_days
+     WHERE is_holiday = true
+       AND date_hijri >= $1
+       AND date_hijri <= $2
+     ORDER BY date_hijri ASC`,
+    [fromDateHijri, toDateHijri]
+  );
+  return result.rows;
+}
+
+// ============================================================
+//  حذف إجازة (إعادتها يوم عمل)
+// ============================================================
+export async function removeHoliday(dateHijri) {
+  await db.query(
+    'DELETE FROM academic_days WHERE date_hijri = $1',
+    [dateHijri]
+  );
+}
+
+// ============================================================
+//  إغلاق قاعدة البيانات
 // ============================================================
 export async function closeDB() {
   if (db) {

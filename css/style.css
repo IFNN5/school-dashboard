@@ -1,9 +1,11 @@
 /* ============================================================
-   style.css — التنسيقات العامة + CSS Variables للتخصيص
+   style.css — التنسيقات الكاملة
+   - التصميم العام + CSS Variables
+   - المعلمات + الحضور + السجل + التقارير + الإعدادات
    ============================================================ */
 
 /* ============================================================
-   المتغيرات الافتراضية (يمكن تغييرها من الإعدادات)
+   المتغيرات
    ============================================================ */
 :root {
   --primary: #2563eb;
@@ -16,17 +18,32 @@
   --sidebar: #1e293b;
   --sidebar-text: #ffffff;
   --sidebar-hover: #334155;
+
   --danger: #dc2626;
+  --danger-hover: #b91c1c;
   --success: #16a34a;
+  --success-hover: #15803d;
   --warning: #f59e0b;
+  --info: #0ea5e9;
+
   --radius: 10px;
+  --radius-sm: 6px;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
+
   --font: 'Segoe UI', Tahoma, system-ui, -apple-system, sans-serif;
+
+  --status-present: #16a34a;
+  --status-late: #f59e0b;
+  --status-excused: #0ea5e9;
+  --status-sick-leave: #8b5cf6;
+  --status-absent: #dc2626;
+  --status-official-leave: #64748b;
+  --status-official-mission: #0891b2;
 }
 
 /* ============================================================
-   إعادة الضبط العامة
+   إعادة الضبط
    ============================================================ */
 * {
   margin: 0;
@@ -43,6 +60,7 @@ body {
   direction: rtl;
   text-align: right;
   line-height: 1.6;
+  font-size: 14px;
 }
 
 body {
@@ -51,19 +69,23 @@ body {
   transition: background 0.2s ease, color 0.2s ease;
 }
 
-/* إخفاء العناصر قبل تحميل Alpine.js لمنع وميض المحتوى */
 [x-cloak] {
   display: none !important;
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: 13px;
 }
 
 /* ============================================================
    الشريط الجانبي
    ============================================================ */
 .sidebar {
-  width: 240px;
+  width: 220px;
   background: var(--sidebar);
   color: var(--sidebar-text);
-  padding: 20px 15px;
+  padding: 20px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -72,10 +94,10 @@ body {
 }
 
 .sidebar h2 {
-  font-size: 18px;
-  margin-bottom: 20px;
+  font-size: 17px;
+  margin-bottom: 18px;
   text-align: center;
-  padding-bottom: 15px;
+  padding-bottom: 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   font-weight: 600;
 }
@@ -83,30 +105,26 @@ body {
 .sidebar nav {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
 }
 
 .sidebar button {
   background: transparent;
   color: var(--sidebar-text);
   border: none;
-  padding: 12px 14px;
-  border-radius: var(--radius);
+  padding: 11px 14px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 15px;
+  font-size: 14px;
   text-align: right;
   font-family: inherit;
-  transition: background 0.15s ease, transform 0.1s ease;
+  transition: background 0.15s ease;
   opacity: 0.85;
 }
 
 .sidebar button:hover {
   background: var(--sidebar-hover);
   opacity: 1;
-}
-
-.sidebar button:active {
-  transform: scale(0.98);
 }
 
 .sidebar button.active {
@@ -120,35 +138,35 @@ body {
    ============================================================ */
 .content {
   flex: 1;
-  padding: 25px 30px;
+  padding: 22px 28px;
   overflow-y: auto;
   max-height: 100vh;
 }
 
 .content h1 {
   margin-bottom: 20px;
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 600;
   color: var(--text);
 }
 
 /* ============================================================
-   شريط البحث اللحظي
+   شريط البحث
    ============================================================ */
 .search-bar {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .search-bar input {
   width: 100%;
-  padding: 12px 16px;
+  padding: 11px 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  font-size: 15px;
+  font-size: 14px;
   background: var(--card-bg);
   color: var(--text);
   font-family: inherit;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .search-bar input::placeholder {
@@ -166,20 +184,20 @@ body {
    ============================================================ */
 .toolbar {
   display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
+  gap: 8px;
+  margin-bottom: 18px;
   flex-wrap: wrap;
 }
 
 .toolbar button,
 .btn {
-  padding: 10px 18px;
+  padding: 9px 16px;
   border: none;
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   background: var(--primary);
   color: #ffffff;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   font-family: inherit;
   font-weight: 500;
   transition: background 0.15s ease, transform 0.1s ease;
@@ -208,7 +226,7 @@ body {
 }
 
 .btn-danger:hover {
-  background: #b91c1c !important;
+  background: var(--danger-hover) !important;
 }
 
 .btn-success {
@@ -216,7 +234,7 @@ body {
 }
 
 .btn-success:hover {
-  background: #15803d !important;
+  background: var(--success-hover) !important;
 }
 
 /* ============================================================
@@ -233,10 +251,11 @@ table {
 
 table th,
 table td {
-  padding: 12px 15px;
+  padding: 11px 14px;
   text-align: right;
   border-bottom: 1px solid var(--border);
-  font-size: 14px;
+  font-size: 13px;
+  vertical-align: middle;
 }
 
 table th {
@@ -244,6 +263,7 @@ table th {
   font-weight: 600;
   color: var(--text-muted);
   white-space: nowrap;
+  font-size: 12.5px;
 }
 
 table tr:last-child td {
@@ -260,16 +280,51 @@ table tbody tr:hover td {
 
 table td button {
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   cursor: pointer;
-  font-size: 16px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition: background 0.15s ease;
+  font-size: 12.5px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
 table td button:hover {
-  background: var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+table tr.inactive td {
+  opacity: 0.55;
+}
+
+/* ============================================================
+   الشارات
+   ============================================================ */
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #ffffff;
+  background: var(--text-muted);
+  white-space: nowrap;
+}
+
+.badge-success {
+  background: var(--success);
+}
+
+.badge-muted {
+  background: var(--text-muted);
+  opacity: 0.7;
+}
+
+.badge-info {
+  background: var(--info);
 }
 
 /* ============================================================
@@ -280,59 +335,57 @@ table td button:hover {
   padding: 20px;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  margin-bottom: 20px;
+  margin-bottom: 18px;
   animation: slideDown 0.2s ease;
 }
 
 @keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .form-panel h3 {
-  margin-bottom: 15px;
-  font-size: 18px;
+  margin-bottom: 14px;
+  font-size: 16px;
   font-weight: 600;
 }
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 15px;
-  margin-bottom: 15px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
 }
 
-.form-grid label {
+.form-grid label,
+.filter-grid label {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 14px;
+  gap: 5px;
+  font-size: 13px;
   color: var(--text-muted);
   font-weight: 500;
 }
 
 .form-grid input,
 .form-grid select,
-.form-grid textarea {
-  padding: 10px 12px;
+.form-grid textarea,
+.filter-grid input,
+.filter-grid select {
+  padding: 9px 12px;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-size: 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
   background: var(--bg);
   color: var(--text);
   font-family: inherit;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .form-grid input:focus,
 .form-grid select:focus,
-.form-grid textarea:focus {
+.filter-grid input:focus,
+.filter-grid select:focus {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
@@ -340,9 +393,9 @@ table td button:hover {
 
 .form-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   justify-content: flex-start;
-  margin-top: 5px;
+  margin-top: 4px;
 }
 
 /* ============================================================
@@ -350,15 +403,16 @@ table td button:hover {
    ============================================================ */
 .settings-panel {
   background: var(--card-bg);
-  padding: 25px;
+  padding: 22px;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  max-width: 600px;
+  max-width: 720px;
+  margin-bottom: 18px;
 }
 
 .settings-panel h3 {
-  margin-bottom: 20px;
-  font-size: 18px;
+  margin-bottom: 16px;
+  font-size: 16px;
   font-weight: 600;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
@@ -368,8 +422,8 @@ table td button:hover {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 0;
-  font-size: 14px;
+  padding: 11px 0;
+  font-size: 13.5px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -378,27 +432,29 @@ table td button:hover {
 }
 
 .settings-panel input[type="color"] {
-  width: 50px;
-  height: 35px;
+  width: 48px;
+  height: 32px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   background: transparent;
   padding: 2px;
 }
 
 .settings-panel input[type="text"],
-.settings-panel input[type="number"] {
-  padding: 8px 12px;
+.settings-panel input[type="number"],
+.settings-panel select {
+  padding: 7px 11px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-family: inherit;
   background: var(--bg);
   color: var(--text);
-  font-size: 14px;
+  font-size: 13px;
 }
 
-.settings-panel input:focus {
+.settings-panel input:focus,
+.settings-panel select:focus {
   outline: none;
   border-color: var(--primary);
 }
@@ -410,52 +466,302 @@ table td button:hover {
   text-align: center;
   padding: 50px 20px;
   color: var(--text-muted);
-  font-size: 15px;
+  font-size: 14px;
   background: var(--card-bg);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
 
 .empty::before {
-  content: '📭';
+  content: '';
   display: block;
-  font-size: 40px;
-  margin-bottom: 10px;
-  opacity: 0.5;
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  background: var(--border);
+  opacity: 0.6;
 }
 
 /* ============================================================
-   رسالة التنبيه (Toast)
+   Toast
    ============================================================ */
 .toast {
   position: fixed;
-  bottom: 30px;
+  bottom: 26px;
   left: 50%;
   transform: translateX(-50%);
   background: var(--success);
   color: #ffffff;
-  padding: 12px 24px;
+  padding: 11px 22px;
   border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
   z-index: 9999;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 500;
   animation: toastIn 0.25s ease;
+  max-width: 90vw;
 }
 
 @keyframes toastIn {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
+  from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
 /* ============================================================
-   شريط التمرير المخصص
+   التنبيهات
+   ============================================================ */
+.alert {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  font-size: 13.5px;
+}
+
+.alert-info {
+  background: #eff6ff;
+  color: #1e40af;
+  border-right: 4px solid var(--primary);
+}
+
+.alert strong {
+  font-weight: 600;
+}
+
+/* ============================================================
+   شريط التاريخ (للحضور)
+   ============================================================ */
+.date-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--card-bg);
+  padding: 16px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.date-display {
+  text-align: center;
+  min-width: 220px;
+  padding: 0 10px;
+}
+
+.date-hijri {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+.date-gregorian {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+/* ============================================================
+   بطاقات الإحصائيات
+   ============================================================ */
+.stats-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.stat-card {
+  background: var(--card-bg);
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  text-align: center;
+  border-top: 3px solid var(--primary);
+}
+
+.stat-card.stat-warning { border-top-color: var(--warning); }
+.stat-card.stat-danger  { border-top-color: var(--danger); }
+.stat-card.stat-info    { border-top-color: var(--info); }
+.stat-card.stat-muted   { border-top-color: var(--text-muted); }
+
+.stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 2px;
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* ============================================================
+   جدول التسجيل الجماعي (الحضور)
+   ============================================================ */
+.attendance-table-wrapper {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.attendance-table {
+  width: 100%;
+  border-collapse: collapse;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.attendance-table th {
+  background: var(--bg);
+  font-size: 12.5px;
+  padding: 12px 10px;
+}
+
+.attendance-table td {
+  padding: 12px 10px;
+  vertical-align: middle;
+}
+
+.attendance-table tr.row-recorded td {
+  background: rgba(22, 163, 74, 0.04);
+}
+
+.teacher-name {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--text);
+}
+
+.teacher-specialty {
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+/* أزرار الحالة */
+.status-buttons {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.status-btn {
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 11.5px;
+  font-family: inherit;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.status-btn:hover {
+  border-color: var(--text-muted);
+  color: var(--text);
+}
+
+.status-btn.status-active {
+  font-weight: 600;
+  border-color: transparent;
+}
+
+/* حقول الوقت والملاحظة */
+.time-input,
+.note-input {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12.5px;
+}
+
+.time-input {
+  width: 90px;
+}
+
+.time-input:focus,
+.note-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+/* ============================================================
+   لوحة الفلاتر (السجل)
+   ============================================================ */
+.filters-panel {
+  background: var(--card-bg);
+  padding: 18px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 18px;
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+/* ============================================================
+   تبويبات التقارير
+   ============================================================ */
+.report-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 18px;
+  background: var(--card-bg);
+  padding: 6px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  flex-wrap: wrap;
+}
+
+.report-tabs button {
+  flex: 1;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  min-width: 100px;
+}
+
+.report-tabs button:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.report-tabs button.active {
+  background: var(--primary);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* ============================================================
+   شريط التمرير
    ============================================================ */
 .content::-webkit-scrollbar {
   width: 8px;
@@ -477,6 +783,25 @@ table td button:hover {
 /* ============================================================
    الاستجابة للشاشات الصغيرة
    ============================================================ */
+@media (max-width: 900px) {
+  .sidebar {
+    width: 180px;
+  }
+
+  .content {
+    padding: 16px 18px;
+  }
+
+  .status-buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .status-btn {
+    text-align: center;
+  }
+}
+
 @media (max-width: 768px) {
   body {
     flex-direction: column;
@@ -486,8 +811,9 @@ table td button:hover {
     width: 100%;
     flex-direction: row;
     overflow-x: auto;
-    padding: 12px;
+    padding: 10px 12px;
     align-items: center;
+    gap: 6px;
   }
 
   .sidebar h2 {
@@ -496,40 +822,73 @@ table td button:hover {
 
   .sidebar nav {
     flex-direction: row;
-    gap: 8px;
+    gap: 6px;
     width: 100%;
   }
 
   .sidebar button {
     white-space: nowrap;
-    padding: 10px 14px;
-    font-size: 14px;
+    padding: 9px 12px;
+    font-size: 13px;
   }
 
   .content {
-    padding: 15px;
+    padding: 14px;
     max-height: none;
   }
 
   .content h1 {
-    font-size: 20px;
+    font-size: 18px;
+    margin-bottom: 14px;
   }
 
-  .form-grid {
+  .form-grid,
+  .filter-grid {
     grid-template-columns: 1fr;
   }
 
   .settings-panel {
     max-width: 100%;
+    padding: 16px;
+  }
+
+  .date-bar {
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .date-display {
+    min-width: auto;
+  }
+
+  .stats-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .report-tabs {
+    flex-direction: column;
+  }
+
+  .report-tabs button {
+    width: 100%;
   }
 
   table {
-    font-size: 13px;
+    font-size: 12.5px;
   }
 
   table th,
   table td {
     padding: 8px 10px;
+  }
+
+  .attendance-table-wrapper {
+    overflow-x: auto;
+  }
+
+  .attendance-table {
+    min-width: 700px;
   }
 }
 
@@ -540,7 +899,10 @@ table td button:hover {
   .sidebar,
   .toolbar,
   .search-bar,
-  .toast {
+  .toast,
+  .report-tabs,
+  .date-bar,
+  .stats-cards {
     display: none !important;
   }
 
