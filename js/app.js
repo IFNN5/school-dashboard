@@ -1,17 +1,30 @@
 // ============================================================
-//  app.js — الملف الرئيسي لمنطق التطبيق (Alpine.js)
-//  يربط كل الوحدات: DB + Search + Import + Export + Theme
+//  app.js — الملف الرئيسي مع Logs تشخيصية شاملة
+//  يُحمَّل Alpine ديناميكيًا في النهاية لضمان ترتيب صحيح
 // ============================================================
 
+// ===== مؤقت لتتبع الأزمنة =====
+const __t0 = performance.now();
+function log(msg, ...args) {
+  const t = (performance.now() - __t0).toFixed(0).padStart(5);
+  console.log(`[${t}ms] ${msg}`, ...args);
+}
+
+log('▶️ app.js: بدأ تحميل الاستيرادات...');
+
+// ============================================================
+//  الاستيرادات الثابتة
+//  ملاحظة: هذه السطور تُنفَّذ قبل أي كود آخر في الملف (hoisting)
+// ============================================================
 import {
   initDB,
   getAllTeachers,
   addTeacher,
   updateTeacher,
   deleteTeacher,
-  bulkInsertTeachers,
-  countTeachers
+  bulkInsertTeachers
 } from './db.js';
+log('✅ db.js تم استيراده');
 
 import {
   initSearch,
@@ -21,11 +34,13 @@ import {
   reindexAll,
   indexSize
 } from './search.js';
+log('✅ search.js تم استيراده');
 
 import {
   handleFileUpload,
   downloadCSVTemplate
 } from './import.js';
+log('✅ import.js تم استيراده');
 
 import {
   loadTheme,
@@ -36,31 +51,36 @@ import {
   importTheme,
   AVAILABLE_FONTS
 } from './theme.js';
+log('✅ theme.js تم استيراده');
 
 import {
   exportJSON,
   exportCSV,
   readJSONFile
 } from './export.js';
+log('✅ export.js تم استيراده');
+
+log('✅ كل الاستيرادات اكتملت');
 
 // ============================================================
 //  كائن Alpine.js الرئيسي
 // ============================================================
 function app() {
+  log('🟢 app() تم استدعاؤها من Alpine');
+
   return {
     // ===== الحالة العامة =====
-    tab: 'teachers',        // التبويب النشط
-    loading: true,          // حالة التحميل الأولي
-    query: '',              // نص البحث
-    toast: '',              // رسالة التنبيه
+    tab: 'teachers',
+    query: '',
+    toast: '',
     _toastTimer: null,
 
     // ===== البيانات =====
-    teachers: [],           // كل المعلمات
-    filteredTeachers: [],   // المعلمات بعد البحث
+    teachers: [],
+    filteredTeachers: [],
     stats: { total: 0, indexed: 0 },
 
-    // ===== نماذج =====
+    // ===== النماذج =====
     showAddForm: false,
     showEditForm: false,
     newTeacher: {
@@ -77,53 +97,47 @@ function app() {
     //  التهيئة الرئيسية
     // ============================================================
     async init() {
-      // 1) تحميل الثيم وتطبيقه أولًا (لمنع الوميض)
+      log('🟢 init(): بدء التهيئة');
+
+      // 1) الثيم
       this.theme = loadTheme();
       applyTheme(this.theme);
+      log('🟢 init(): الثيم مطبَّق');
 
-      // 2) تهيئة قاعدة البيانات
+      // 2) قاعدة البيانات
       try {
         await initDB();
-        console.log('✅ Database initialized');
+        log('🟢 init(): قاعدة البيانات جاهزة');
       } catch (err) {
-        console.error('❌ Database init failed:', err);
+        console.error('🔴 Database init failed:', err);
         this.showToast('❌ فشل تهيئة قاعدة البيانات', 4000);
-        this.loading = false;
         return;
       }
 
-      // 3) تحميل البيانات وتجهيز البحث
+      // 3) تحميل البيانات
       await this.loadTeachers();
+      log('🟢 init(): البيانات محمّلة (' + this.teachers.length + ' معلمة)');
 
-      // 4) إنهاء حالة التحميل
-      this.loading = false;
-
+      // 4) Service Worker
       // ============================================================
-      //  👇👇👇  كود تسجيل Service Worker — ابدأ من هنا  👇👇👇
-      // ============================================================
-      //  مسؤول عن تفعيل العمل أوفلاين:
-      //  - يخزّن ملفات التطبيق في الكاش
-      //  - يجعل التطبيق يعمل بدون إنترنت بعد أول تحميل
-      //  - يُسجَّل في نهاية init() حتى لا يتنافس مع تحميل الصفحة
+      //  👇 كود تسجيل Service Worker — ابدأ من هنا
       // ============================================================
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('./sw.js')
-            .then(reg => {
-              console.log('✅ Service Worker registered. Scope:', reg.scope);
-            })
-            .catch(err => {
-              console.error('❌ Service Worker registration failed:', err);
-            });
+            .then(reg => log('🟢 Service Worker مسجَّل. النطاق: ' + reg.scope))
+            .catch(err => console.error('🔴 Service Worker failed:', err));
         });
       }
       // ============================================================
-      //  👆👆👆  نهاية كود تسجيل Service Worker  👆👆👆
+      //  👆 نهاية كود Service Worker
       // ============================================================
+
+      log('🟢 init(): اكتملت التهيئة بنجاح');
     },
 
     // ============================================================
-    //  تحميل كل المعلمات وتحديث البحث
+    //  تحميل المعلمات
     // ============================================================
     async loadTeachers() {
       try {
@@ -132,8 +146,9 @@ function app() {
         this.filteredTeachers = this.teachers;
         this.stats.total = this.teachers.length;
         this.stats.indexed = indexSize();
+        log('📚 loadTeachers(): ' + this.teachers.length + ' سجل');
       } catch (err) {
-        console.error('loadTeachers error:', err);
+        console.error('🔴 loadTeachers error:', err);
         this.showToast('❌ فشل تحميل البيانات', 4000);
       }
     },
@@ -143,55 +158,40 @@ function app() {
     // ============================================================
     liveSearch() {
       const q = (this.query || '').trim();
-
       if (q === '') {
         this.filteredTeachers = this.teachers;
         return;
       }
-
       try {
-        const results = searchTeachers(q);
-        this.filteredTeachers = results;
+        this.filteredTeachers = searchTeachers(q);
       } catch (err) {
-        console.error('Search error:', err);
+        console.error('🔴 Search error:', err);
         this.filteredTeachers = [];
       }
     },
 
     // ============================================================
-    //  مسح البحث
-    // ============================================================
-    clearSearch() {
-      this.query = '';
-      this.filteredTeachers = this.teachers;
-    },
-
-    // ============================================================
-    //  إضافة معلمة جديدة
+    //  إضافة معلمة
     // ============================================================
     async saveNewTeacher(t) {
       if (!t.name || t.name.trim() === '') {
         this.showToast('⚠️ الاسم مطلوب', 3000);
         return;
       }
-
       try {
         const newT = await addTeacher(t);
         this.teachers.push(newT);
         addToIndex(newT);
         this.filteredTeachers = this.teachers;
         this.stats.total = this.teachers.length;
-
-        // إعادة تعيين النموذج
         this.newTeacher = {
           name: '', specialty: '', phone: '',
           email: '', hire_date: '', notes: ''
         };
         this.showAddForm = false;
-
         this.showToast('✅ تمت إضافة المعلمة بنجاح');
       } catch (err) {
-        console.error('Add error:', err);
+        console.error('🔴 Add error:', err);
         this.showToast('❌ فشل إضافة المعلمة', 4000);
       }
     },
@@ -213,25 +213,18 @@ function app() {
         this.showToast('⚠️ الاسم مطلوب', 3000);
         return;
       }
-
       try {
         const updated = await updateTeacher(t.id, t);
-
-        // تحديث المصفوفة
         const idx = this.teachers.findIndex(x => x.id === t.id);
         if (idx !== -1) this.teachers[idx] = updated;
-
-        // تحديث البحث
         removeFromIndex(t.id);
         addToIndex(updated);
-
         this.filteredTeachers = this.teachers;
         this.showEditForm = false;
         this.editingTeacher = null;
-
         this.showToast('✅ تم تحديث البيانات');
       } catch (err) {
-        console.error('Update error:', err);
+        console.error('🔴 Update error:', err);
         this.showToast('❌ فشل التحديث', 4000);
       }
     },
@@ -250,78 +243,68 @@ function app() {
     async deleteTeacher(id) {
       const teacher = this.teachers.find(x => x.id === id);
       const name = teacher ? teacher.name : '';
-
       if (!confirm(`هل أنتِ متأكدة من حذف "${name}"؟`)) return;
-
       try {
         await deleteTeacher(id);
         this.teachers = this.teachers.filter(x => x.id !== id);
         removeFromIndex(id);
         this.filteredTeachers = this.teachers;
         this.stats.total = this.teachers.length;
-
         this.showToast('🗑️ تم الحذف بنجاح');
       } catch (err) {
-        console.error('Delete error:', err);
+        console.error('🔴 Delete error:', err);
         this.showToast('❌ فشل الحذف', 4000);
       }
     },
 
     // ============================================================
-    //  استيراد CSV / JSON (إضافة للموجود)
+    //  استيراد CSV / JSON
     // ============================================================
     importFile() {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = '.csv,.json,.txt';
-
       input.onchange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
         handleFileUpload(file, async (teachers, error) => {
           if (error) {
             this.showToast('❌ ' + error, 4000);
             return;
           }
-
           try {
             const inserted = await bulkInsertTeachers(teachers);
             await this.loadTeachers();
             this.showToast(`✅ تم استيراد ${inserted} معلمة`);
           } catch (err) {
-            console.error('Bulk insert error:', err);
+            console.error('🔴 Bulk insert error:', err);
             this.showToast('❌ فشل الاستيراد', 4000);
           }
         });
       };
-
       input.click();
     },
 
     // ============================================================
-    //  استيراد نسخة احتياطية JSON
+    //  استيراد نسخة احتياطية
     // ============================================================
     importBackup() {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = '.json';
-
       input.onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
         try {
           const data = await readJSONFile(file);
           const inserted = await bulkInsertTeachers(data);
           await this.loadTeachers();
           this.showToast(`✅ تم استيراد ${inserted} سجل`);
         } catch (err) {
-          console.error('Import backup error:', err);
+          console.error('🔴 Import backup error:', err);
           this.showToast('❌ ' + err.message, 4000);
         }
       };
-
       input.click();
     },
 
@@ -333,7 +316,6 @@ function app() {
         this.showToast('⚠️ لا توجد بيانات للتصدير', 3000);
         return;
       }
-
       try {
         if (format === 'csv') {
           exportCSV(this.teachers, null, 'teachers');
@@ -342,7 +324,7 @@ function app() {
         }
         this.showToast('📤 تم تصدير البيانات');
       } catch (err) {
-        console.error('Export error:', err);
+        console.error('🔴 Export error:', err);
         this.showToast('❌ فشل التصدير', 4000);
       }
     },
@@ -364,14 +346,10 @@ function app() {
 
     saveTheme() {
       const ok = saveTheme(this.theme);
-      if (ok) {
-        this.showToast('🎨 تم حفظ التخصيص');
-      } else {
-        this.showToast('❌ فشل الحفظ', 4000);
-      }
+      this.showToast(ok ? '🎨 تم حفظ التخصيص' : '❌ فشل الحفظ', ok ? 2500 : 4000);
     },
 
-    async resetTheme() {
+    resetTheme() {
       if (!confirm('استعادة الألوان الافتراضية؟')) return;
       this.theme = resetTheme();
       this.showToast('🔄 تمت الاستعادة');
@@ -386,39 +364,50 @@ function app() {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = '.json';
-
       input.onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
         try {
           this.theme = await importTheme(file);
           this.showToast('✅ تم استيراد الإعدادات');
         } catch (err) {
-          console.error('Import theme error:', err);
+          console.error('🔴 Import theme error:', err);
           this.showToast('❌ ' + err.message, 4000);
         }
       };
-
       input.click();
     },
 
     // ============================================================
-    //  رسالة Toast
-    //  @param {string} msg — نص الرسالة
-    //  @param {number} duration — مدة العرض بالميلي ثانية
+    //  Toast
     // ============================================================
     showToast(msg, duration = 2500) {
       this.toast = msg;
       clearTimeout(this._toastTimer);
-      this._toastTimer = setTimeout(() => {
-        this.toast = '';
-      }, duration);
+      this._toastTimer = setTimeout(() => { this.toast = ''; }, duration);
     }
   };
 }
 
 // ============================================================
-//  ربط Alpine.js
+//  تعريف app على النافذة
 // ============================================================
 window.app = app;
+log('✅ window.app جاهز');
+
+// ============================================================
+//  تحميل Alpine.js ديناميكيًا ثم تشغيله
+//  هذا يضمن أن app() معرّفة قبل أن يبدأ Alpine
+// ============================================================
+log('⏳ بدء تحميل Alpine.js...');
+
+import('https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/module.esm.js')
+  .then(mod => {
+    log('✅ Alpine.js تم تحميله');
+    window.Alpine = mod.default;
+    mod.default.start();
+    log('🚀 Alpine.start() — التطبيق بدأ');
+  })
+  .catch(err => {
+    console.error('🔴 فشل تحميل Alpine:', err);
+  });
