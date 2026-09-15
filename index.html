@@ -7,12 +7,12 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="css/style.css">
-  <!-- ملاحظة: Alpine.js يُحمَّل في نهاية body بعد app.js -->
+  <!-- ⚠️ Alpine.js لا يُحمَّل من هنا — يتم تحميله ديناميكيًا من app.js -->
 </head>
 <body x-data="app()" x-init="init()" x-cloak>
 
   <!-- ============================================================
-       الشريط الجانبي — التنقل بين التبويبات
+       الشريط الجانبي
   ============================================================ -->
   <aside class="sidebar">
     <h2>🏫 لوحة الوكيلة</h2>
@@ -35,7 +35,6 @@
       <div>
         <h1>👩‍🏫 المعلمات</h1>
 
-        <!-- البحث اللحظي -->
         <div class="search-bar">
           <input type="text"
                  x-model="query"
@@ -43,7 +42,6 @@
                  placeholder="🔍 ابحث بالاسم أو التخصص أو الهاتف...">
         </div>
 
-        <!-- شريط الأدوات -->
         <div class="toolbar">
           <button @click="showAddForm = !showAddForm">➕ إضافة معلمة</button>
           <button @click="importFile()">📥 استيراد CSV / JSON</button>
@@ -114,7 +112,7 @@
           </div>
         </template>
 
-        <!-- جدول المعلمات -->
+        <!-- الجدول -->
         <template x-if="filteredTeachers.length > 0">
           <table>
             <thead>
@@ -143,7 +141,6 @@
           </table>
         </template>
 
-        <!-- حالة عدم وجود نتائج -->
         <template x-if="filteredTeachers.length === 0">
           <div class="empty">
             <p x-text="query ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد معلمات — ابدئي بإضافة معلمة'"></p>
@@ -152,33 +149,27 @@
       </div>
     </template>
 
-    <!-- ============ تبويب: الحضور (مؤقت) ============ -->
+    <!-- ============ تبويب: الحضور ============ -->
     <template x-if="tab==='attendance'">
       <div>
         <h1>📋 الحضور والغياب</h1>
-        <div class="empty">
-          <p>سيتم إضافة وحدة تسجيل الحضور هنا</p>
-        </div>
+        <div class="empty"><p>سيتم إضافة وحدة تسجيل الحضور هنا</p></div>
       </div>
     </template>
 
-    <!-- ============ تبويب: الجدول (مؤقت) ============ -->
+    <!-- ============ تبويب: الجدول ============ -->
     <template x-if="tab==='schedule'">
       <div>
         <h1>📅 الجدول الدراسي</h1>
-        <div class="empty">
-          <p>سيتم إضافة بناء الجدول وتوزيع الحصص هنا</p>
-        </div>
+        <div class="empty"><p>سيتم إضافة بناء الجدول وتوزيع الحصص هنا</p></div>
       </div>
     </template>
 
-    <!-- ============ تبويب: الزيارات الصفية (مؤقت) ============ -->
+    <!-- ============ تبويب: الزيارات ============ -->
     <template x-if="tab==='visits'">
       <div>
         <h1>🔍 الزيارات الصفية</h1>
-        <div class="empty">
-          <p>سيتم إضافة جدولة الزيارات ونماذج الملاحظات هنا</p>
-        </div>
+        <div class="empty"><p>سيتم إضافة جدولة الزيارات ونماذج الملاحظات هنا</p></div>
       </div>
     </template>
 
@@ -187,10 +178,8 @@
       <div>
         <h1>⚙️ الإعدادات</h1>
 
-        <!-- لوحة تخصيص الألوان -->
         <div class="settings-panel">
           <h3>🎨 تخصيص الألوان</h3>
-
           <label>
             <span>اللون الأساسي</span>
             <input type="color" x-model="theme.primary" @input="applyTheme()">
@@ -213,10 +202,8 @@
           </label>
         </div>
 
-        <!-- لوحة الخط والحواف -->
         <div class="settings-panel" style="margin-top:20px;">
           <h3>✍️ الخط والحواف</h3>
-
           <label>
             <span>نوع الخط</span>
             <select x-model="theme.font" @change="applyTheme()"
@@ -226,7 +213,6 @@
               </template>
             </select>
           </label>
-
           <label>
             <span>نصف قطر الحواف (بكسل)</span>
             <input type="number" min="0" max="30"
@@ -236,7 +222,6 @@
           </label>
         </div>
 
-        <!-- أزرار حفظ الثيم -->
         <div class="settings-panel" style="margin-top:20px;">
           <div class="toolbar">
             <button @click="saveTheme()">💾 حفظ التخصيص</button>
@@ -246,7 +231,6 @@
           </div>
         </div>
 
-        <!-- لوحة النسخ الاحتياطي -->
         <div class="settings-panel" style="margin-top:20px;">
           <h3>💾 النسخ الاحتياطي للبيانات</h3>
           <div class="toolbar">
@@ -255,7 +239,6 @@
           </div>
         </div>
 
-        <!-- معلومات النظام -->
         <div class="settings-panel" style="margin-top:20px;">
           <h3>ℹ️ معلومات النظام</h3>
           <label>
@@ -272,18 +255,16 @@
 
   </main>
 
-  <!-- ============ رسالة التنبيه السفلية ============ -->
+  <!-- ============ رسالة التنبيه ============ -->
   <template x-if="toast">
     <div class="toast" x-text="toast"></div>
   </template>
 
   <!-- ============================================================
-       ترتيب تحميل السكربتات مهم جدًا:
-       1) app.js أولًا (يعرّف window.app)
-       2) Alpine.js ثانيًا (يستخدم window.app)
+       ⚠️ Alpine.js يُحمَّل ديناميكيًا من داخل app.js
+       لا نضعه هنا لتفادي سباق التحميل
   ============================================================ -->
   <script type="module" src="js/app.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
 </body>
 </html>
