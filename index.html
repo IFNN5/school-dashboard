@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة وكيلة المعلمات</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/style.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body x-data="app()" x-init="init()">
+
+  <!-- الشريط الجانبي -->
+  <aside class="sidebar">
+    <h2>🏫 لوحة الوكيلة</h2>
+    <nav>
+      <button @click="tab='teachers'" :class="{active: tab==='teachers'}">👩‍🏫 المعلمات</button>
+      <button @click="tab='attendance'" :class="{active: tab==='attendance'}">📋 الحضور</button>
+      <button @click="tab='schedule'" :class="{active: tab==='schedule'}">📅 الجدول</button>
+      <button @click="tab='visits'" :class="{active: tab==='visits'}">🔍 الزيارات الصفية</button>
+      <button @click="tab='settings'" :class="{active: tab==='settings'}">⚙️ الإعدادات</button>
+    </nav>
+  </aside>
+
+  <!-- المحتوى الرئيسي -->
+  <main class="content">
+    <!-- بحث لحظي -->
+    <div class="search-bar">
+      <input type="text" x-model="query" @input="liveSearch()" placeholder="🔍 ابحث عن معلمة...">
+    </div>
+
+    <!-- تبويب المعلمات -->
+    <template x-if="tab==='teachers'">
+      <div>
+        <div class="toolbar">
+          <button @click="showAddForm=true">➕ إضافة معلمة</button>
+          <button @click="importFile()">📥 استيراد CSV</button>
+          <button @click="exportData()">📤 تصدير البيانات</button>
+        </div>
+        <table>
+          <thead>
+            <tr><th>الاسم</th><th>التخصص</th><th>الهاتف</th><th>إجراءات</th></tr>
+          </thead>
+          <tbody>
+            <template x-for="teacher in filteredTeachers" :key="teacher.id">
+              <tr>
+                <td x-text="teacher.name"></td>
+                <td x-text="teacher.specialty"></td>
+                <td x-text="teacher.phone"></td>
+                <td>
+                  <button @click="editTeacher(teacher)">✏️</button>
+                  <button @click="deleteTeacher(teacher.id)">🗑️</button>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </template>
+
+    <!-- تبويب الإعدادات -->
+    <template x-if="tab==='settings'">
+      <div class="settings-panel">
+        <h3>🎨 تخصيص الألوان</h3>
+        <label>اللون الأساسي: <input type="color" x-model="theme.primary" @input="applyTheme()"></label>
+        <label>لون الخلفية: <input type="color" x-model="theme.bg" @input="applyTheme()"></label>
+        <label>لون النص: <input type="color" x-model="theme.text" @input="applyTheme()"></label>
+        <button @click="saveTheme()">💾 حفظ التخصيص</button>
+      </div>
+    </template>
+  </main>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
