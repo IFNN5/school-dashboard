@@ -3,10 +3,6 @@
 //  يربط كل الوحدات: DB + Search + Import + Export + Theme + Attendance
 // ============================================================
 
-// ⚠️ مهم جدًا: منع Alpine من البدء التلقائي
-// حتى نتحكم نحن بوقت البدء بعد تجهيز window.app
-window.deferLoadingAlpine = true;
-
 // ===== مؤقت تتبع الأزمنة =====
 const __t0 = performance.now();
 function log(msg, ...args) {
@@ -142,7 +138,7 @@ function app() {
     availableFonts: AVAILABLE_FONTS,
 
     // ============================================================
-    //  ============ قسم الحضور ============
+    //  قسم الحضور
     // ============================================================
     attendanceDate: '',
     attendanceDateLabel: '',
@@ -156,7 +152,7 @@ function app() {
     ATTENDANCE_STATUSES,
 
     // ============================================================
-    //  ============ قسم السجل ============
+    //  قسم السجل
     // ============================================================
     historyFilters: {
       from: '',
@@ -168,7 +164,7 @@ function app() {
     historyLoading: false,
 
     // ============================================================
-    //  ============ قسم التقارير ============
+    //  قسم التقارير
     // ============================================================
     reportTab: 'daily',
 
@@ -197,12 +193,10 @@ function app() {
     async init() {
       log('🟢 init(): بدء التهيئة');
 
-      // 1) الثيم
       this.theme = loadTheme();
       applyTheme(this.theme);
       log('🟢 الثيم مطبَّق');
 
-      // 2) قاعدة البيانات
       try {
         await initDB();
         log('🟢 قاعدة البيانات جاهزة');
@@ -212,25 +206,20 @@ function app() {
         return;
       }
 
-      // 3) قائمة الحالات
       this.statusList = getStatusList();
 
-      // 4) تحميل المعلمات
       await this.loadTeachers();
       log('🟢 المعلمات محمّلة (' + this.teachers.length + ')');
 
-      // 5) تهيئة تاريخ الحضور (اليوم)
       this.attendanceDate = todayHijriKey();
       await this.loadDayRoster();
       log('🟢 حضور اليوم محمّل');
 
-      // 6) نطاق الشهر الحالي للتقارير
       const range = getCurrentHijriMonthRange();
       this.reportRange.from = range.from;
       this.reportRange.to = range.to;
       this.reportRange.label = range.label;
 
-      // 7) Service Worker
       // ============================================================
       //  👇 تسجيل Service Worker — ابدأ من هنا
       // ============================================================
@@ -249,9 +238,8 @@ function app() {
     },
 
     // ============================================================
-    //  ============ دوال المعلمات ============
+    //  دوال المعلمات
     // ============================================================
-
     async loadTeachers() {
       try {
         this.teachers = await getAllTeachers(this.showInactiveTeachers);
@@ -375,9 +363,8 @@ function app() {
     },
 
     // ============================================================
-    //  ============ دوال الحضور ============
+    //  دوال الحضور
     // ============================================================
-
     async loadDayRoster() {
       if (!this.attendanceDate) return;
 
@@ -429,15 +416,12 @@ function app() {
     setStatus(teacherId, status) {
       const item = this.roster.find(r => r.teacher.id === teacherId);
       if (!item) return;
-
       if (item.status === status) {
         item.status = null;
         item.time = '';
         return;
       }
-
       item.status = status;
-
       if (!['late', 'excused'].includes(status)) {
         item.time = '';
       }
@@ -455,9 +439,7 @@ function app() {
 
     setAllPresent() {
       this.roster.forEach(item => {
-        if (!item.status) {
-          item.status = 'present';
-        }
+        if (!item.status) item.status = 'present';
       });
       this.calculateDashboardStats();
       this.showToast('✅ تم تعيين الباقي كحاضرة');
@@ -530,27 +512,16 @@ function app() {
 
     calculateDashboardStats() {
       const s = {
-        todayPresent: 0,
-        todayAbsent: 0,
-        todayLate: 0,
-        todayExcused: 0,
-        todayNotRecorded: 0
+        todayPresent: 0, todayAbsent: 0, todayLate: 0,
+        todayExcused: 0, todayNotRecorded: 0
       };
-
       this.roster.forEach(r => {
-        if (!r.status) {
-          s.todayNotRecorded++;
-        } else if (r.status === 'present') {
-          s.todayPresent++;
-        } else if (r.status === 'absent' || r.status === 'sick_leave') {
-          s.todayAbsent++;
-        } else if (r.status === 'late') {
-          s.todayLate++;
-        } else if (r.status === 'excused') {
-          s.todayExcused++;
-        }
+        if (!r.status) s.todayNotRecorded++;
+        else if (r.status === 'present') s.todayPresent++;
+        else if (r.status === 'absent' || r.status === 'sick_leave') s.todayAbsent++;
+        else if (r.status === 'late') s.todayLate++;
+        else if (r.status === 'excused') s.todayExcused++;
       });
-
       this.dashboardStats = s;
     },
 
@@ -584,9 +555,8 @@ function app() {
     },
 
     // ============================================================
-    //  ============ دوال السجل ============
+    //  دوال السجل
     // ============================================================
-
     async loadHistory() {
       this.historyLoading = true;
       try {
@@ -595,7 +565,6 @@ function app() {
         if (this.historyFilters.to) filters.to = this.historyFilters.to;
         if (this.historyFilters.teacher_id) filters.teacher_id = parseInt(this.historyFilters.teacher_id);
         if (this.historyFilters.status) filters.status = this.historyFilters.status;
-
         this.historyRecords = await getAttendanceHistory(filters);
       } catch (err) {
         console.error('🔴 loadHistory:', err);
@@ -606,21 +575,13 @@ function app() {
     },
 
     clearHistoryFilters() {
-      this.historyFilters = {
-        from: '',
-        to: '',
-        teacher_id: '',
-        status: ''
-      };
+      this.historyFilters = { from: '', to: '', teacher_id: '', status: '' };
       this.historyRecords = [];
     },
 
     formatRecordDate(key) {
-      try {
-        return formatHijri(keyToHijri(key));
-      } catch {
-        return key;
-      }
+      try { return formatHijri(keyToHijri(key)); }
+      catch { return key; }
     },
 
     getStatusLabel(status) {
@@ -632,9 +593,8 @@ function app() {
     },
 
     // ============================================================
-    //  ============ دوال التقارير ============
+    //  دوال التقارير
     // ============================================================
-
     async exportDailyReport() {
       try {
         await generateDailyReport(this.attendanceDate);
@@ -697,7 +657,6 @@ function app() {
         if (this.historyFilters.to) filters.to = this.historyFilters.to;
         if (this.historyFilters.teacher_id) filters.teacher_id = parseInt(this.historyFilters.teacher_id);
         if (this.historyFilters.status) filters.status = this.historyFilters.status;
-
         await generateHistoryReport(filters);
         this.showToast('📄 تم توليد تقرير السجل');
       } catch (err) {
@@ -728,9 +687,8 @@ function app() {
     },
 
     // ============================================================
-    //  ============ دوال الاستيراد والتصدير ============
+    //  دوال الاستيراد والتصدير
     // ============================================================
-
     importFile() {
       const input = document.createElement('input');
       input.type = 'file';
@@ -800,12 +758,9 @@ function app() {
     },
 
     // ============================================================
-    //  ============ دوال الثيم ============
+    //  دوال الثيم
     // ============================================================
-
-    applyTheme() {
-      applyTheme(this.theme);
-    },
+    applyTheme() { applyTheme(this.theme); },
 
     saveTheme() {
       const ok = saveTheme(this.theme);
@@ -842,7 +797,7 @@ function app() {
     },
 
     // ============================================================
-    //  ============ Toast ============
+    //  Toast
     // ============================================================
     showToast(msg, duration = 2500) {
       this.toast = msg;
@@ -853,24 +808,21 @@ function app() {
 }
 
 // ============================================================
-//  ربط app على النافذة
+//  ربط app على النافذة — يجب أن يكون قبل Alpine
 // ============================================================
 window.app = app;
 log('✅ window.app جاهز');
 
 // ============================================================
-//  تحميل Alpine.js ديناميكياً
-//  مع deferLoadingAlpine = true في الأعلى، Alpine لن يبدأ تلقائياً
-//  حتى نستدعي .start() يدوياً مرة واحدة
+//  تحميل Alpine.js
+//  نتركه يبدأ تلقائياً — لا نستدعي .start() يدوياً
+//  window.app معرَّف قبله، فيجده Alpine جاهزاً
 // ============================================================
 log('⏳ بدء تحميل Alpine.js...');
 
 import('https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/module.esm.js')
-  .then(mod => {
-    log('✅ Alpine.js تم تحميله');
-    window.Alpine = mod.default;
-    window.Alpine.start();
-    log('🚀 Alpine.start() — التطبيق بدأ');
+  .then(() => {
+    log('🚀 Alpine.js تم تحميله وبدأ تلقائياً');
   })
   .catch(err => {
     console.error('🔴 فشل تحميل Alpine:', err);
