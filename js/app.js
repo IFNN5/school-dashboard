@@ -3,6 +3,10 @@
 //  يربط كل الوحدات: DB + Search + Import + Export + Theme + Attendance
 // ============================================================
 
+// ⚠️ مهم جدًا: منع Alpine من البدء التلقائي
+// حتى نتحكم نحن بوقت البدء بعد تجهيز window.app
+window.deferLoadingAlpine = true;
+
 // ===== مؤقت تتبع الأزمنة =====
 const __t0 = performance.now();
 function log(msg, ...args) {
@@ -140,15 +144,14 @@ function app() {
     // ============================================================
     //  ============ قسم الحضور ============
     // ============================================================
-    attendanceDate: '',              // مفتاح التاريخ الهجري الحالي
-    attendanceDateLabel: '',         // "الأحد، 15 رمضان 1446"
-    attendanceDateGregorian: '',     // "2025-03-15"
-    roster: [],                      // [{ teacher, attendance }]
+    attendanceDate: '',
+    attendanceDateLabel: '',
+    attendanceDateGregorian: '',
+    roster: [],
     dayStatus: { isWorking: true, reason: null },
     isHoliday: false,
     holidayName: '',
 
-    // الحالات
     statusList: [],
     ATTENDANCE_STATUSES,
 
@@ -167,22 +170,19 @@ function app() {
     // ============================================================
     //  ============ قسم التقارير ============
     // ============================================================
-    reportTab: 'daily',              // daily | teacher | general | history | holidays
+    reportTab: 'daily',
 
-    // تقرير الفترة
     reportRange: {
       from: '',
       to: '',
       label: ''
     },
 
-    // تقرير معلمة
     reportTeacher: {
       id: '',
       name: ''
     },
 
-    // إحصائيات للبطاقات
     dashboardStats: {
       todayPresent: 0,
       todayAbsent: 0,
@@ -378,14 +378,10 @@ function app() {
     //  ============ دوال الحضور ============
     // ============================================================
 
-    /**
-     * تحميل قائمة المعلمات + سجلات الحضور لليوم الحالي
-     */
     async loadDayRoster() {
       if (!this.attendanceDate) return;
 
       try {
-        // تحديث التسميات
         const hijri = keyToHijri(this.attendanceDate);
         const greg = toGregorian(hijri.year, hijri.month, hijri.day);
         const weekday = getWeekdayAr(greg);
@@ -393,14 +389,11 @@ function app() {
         this.attendanceDateLabel = `${weekday}، ${formatHijri(hijri)}`;
         this.attendanceDateGregorian = formatGregorianShort(greg);
 
-        // فحص إذا كان يوم عمل
         this.dayStatus = await checkWorkingDay(this.attendanceDate);
         this.isHoliday = !this.dayStatus.isWorking;
 
-        // جلب البيانات
         this.roster = await getDayRoster(this.attendanceDate);
 
-        // ضمان وجود حالة افتراضية لكل معلمة في الواجهة
         this.roster = this.roster.map(item => ({
           teacher: item.teacher,
           status: item.attendance?.status || null,
@@ -409,10 +402,8 @@ function app() {
           hasRecord: !!item.attendance
         }));
 
-        // تحديث إحصائيات البطاقات
         this.calculateDashboardStats();
 
-        // جلب اسم الإجازة إن وجدت
         if (this.isHoliday) {
           const status = await getDayStatus(this.attendanceDate);
           this.holidayName = status?.holiday_name || this.dayStatus.reason || 'إجازة';
@@ -425,30 +416,20 @@ function app() {
       }
     },
 
-    /**
-     * الانتقال ليوم آخر
-     */
     async navigateDay(delta) {
       this.attendanceDate = navigateDay(this.attendanceDate, delta);
       await this.loadDayRoster();
     },
 
-    /**
-     * الانتقال لليوم الحالي
-     */
     async goToToday() {
       this.attendanceDate = todayHijriKey();
       await this.loadDayRoster();
     },
 
-    /**
-     * تعيين حالة معلمة
-     */
     setStatus(teacherId, status) {
       const item = this.roster.find(r => r.teacher.id === teacherId);
       if (!item) return;
 
-      // إذا كانت الحالة نفسها مضغوطة، ألغها
       if (item.status === status) {
         item.status = null;
         item.time = '';
@@ -457,31 +438,21 @@ function app() {
 
       item.status = status;
 
-      // مسح الوقت إذا كانت الحالة لا تحتاجه
       if (!['late', 'excused'].includes(status)) {
         item.time = '';
       }
     },
 
-    /**
-     * تعيين وقت معلمة
-     */
     setTime(teacherId, time) {
       const item = this.roster.find(r => r.teacher.id === teacherId);
       if (item) item.time = time;
     },
 
-    /**
-     * تعيين ملاحظة
-     */
     setNote(teacherId, note) {
       const item = this.roster.find(r => r.teacher.id === teacherId);
       if (item) item.note = note;
     },
 
-    /**
-     * تعيين الكل حاضرة (فقط من لم تُسجَّل حالته)
-     */
     setAllPresent() {
       this.roster.forEach(item => {
         if (!item.status) {
@@ -492,9 +463,6 @@ function app() {
       this.showToast('✅ تم تعيين الباقي كحاضرة');
     },
 
-    /**
-     * مسح كل الحضور في الواجهة (بدون حفظ)
-     */
     clearDayUI() {
       if (!confirm('مسح كل التسجيلات في هذا اليوم من الواجهة؟')) return;
       this.roster.forEach(item => {
@@ -505,9 +473,6 @@ function app() {
       this.calculateDashboardStats();
     },
 
-    /**
-     * حذف كل سجلات اليوم من قاعدة البيانات
-     */
     async deleteDayFromDB() {
       if (!confirm('حذف كل سجلات هذا اليوم نهائياً من قاعدة البيانات؟')) return;
       try {
@@ -520,11 +485,7 @@ function app() {
       }
     },
 
-    /**
-     * حفظ تسجيل اليوم
-     */
     async saveDay() {
-      // التحقق: يجب تعيين حالة لكل معلمة
       const unassigned = this.roster.filter(r => !r.status);
       if (unassigned.length > 0) {
         const names = unassigned.slice(0, 3).map(r => r.teacher.name).join('، ');
@@ -534,7 +495,6 @@ function app() {
         }
       }
 
-      // التحقق: من تحتاج وقت ولم تُسجَّل
       const missingTime = this.roster.filter(r =>
         r.status && ['late', 'excused'].includes(r.status) && !r.time
       );
@@ -568,9 +528,6 @@ function app() {
       }
     },
 
-    /**
-     * حساب إحصائيات البطاقات لليوم الحالي
-     */
     calculateDashboardStats() {
       const s = {
         todayPresent: 0,
@@ -597,16 +554,12 @@ function app() {
       this.dashboardStats = s;
     },
 
-    /**
-     * تعيين اليوم كإجازة أو إلغاء
-     */
     async toggleHoliday() {
       const hijri = keyToHijri(this.attendanceDate);
       const greg = toGregorian(hijri.year, hijri.month, hijri.day);
       const gregKey = formatGregorianShort(greg);
 
       if (this.isHoliday) {
-        // إلغاء الإجازة
         if (!confirm('إلغاء الإجازة وجعل اليوم يوم عمل؟')) return;
         try {
           await removeHoliday(this.attendanceDate);
@@ -617,7 +570,6 @@ function app() {
           this.showToast('❌ فشلت العملية', 4000);
         }
       } else {
-        // تعيين إجازة
         const name = prompt('اسم الإجازة (اتركيه فارغاً للإجازة العامة):', '');
         if (name === null) return;
         try {
@@ -663,9 +615,6 @@ function app() {
       this.historyRecords = [];
     },
 
-    /**
-     * تنسيق تاريخ هجري من مفتاح
-     */
     formatRecordDate(key) {
       try {
         return formatHijri(keyToHijri(key));
@@ -771,9 +720,6 @@ function app() {
       }
     },
 
-    /**
-     * تعيين نطاق الشهر الحالي
-     */
     setCurrentMonthRange() {
       const range = getCurrentHijriMonthRange();
       this.reportRange.from = range.from;
@@ -914,6 +860,8 @@ log('✅ window.app جاهز');
 
 // ============================================================
 //  تحميل Alpine.js ديناميكياً
+//  مع deferLoadingAlpine = true في الأعلى، Alpine لن يبدأ تلقائياً
+//  حتى نستدعي .start() يدوياً مرة واحدة
 // ============================================================
 log('⏳ بدء تحميل Alpine.js...');
 
@@ -921,7 +869,7 @@ import('https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/module.esm.js')
   .then(mod => {
     log('✅ Alpine.js تم تحميله');
     window.Alpine = mod.default;
-    mod.default.start();
+    window.Alpine.start();
     log('🚀 Alpine.start() — التطبيق بدأ');
   })
   .catch(err => {
