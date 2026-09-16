@@ -3,6 +3,9 @@
 //  يربط كل الوحدات: DB + Search + Import + Export + Theme + Attendance
 // ============================================================
 
+// ⚠️ منع Alpine من البدء التلقائي — نتحكم نحن بوقت البدء
+window.deferLoadingAlpine = true;
+
 // ===== مؤقت تتبع الأزمنة =====
 const __t0 = performance.now();
 function log(msg, ...args) {
@@ -191,6 +194,13 @@ function app() {
     //  التهيئة الرئيسية
     // ============================================================
     async init() {
+      // حماية من الاستدعاء المزدوج
+      if (window.__appInitialized) {
+        log('🟡 init() مُتجاهَلة (بدأت مسبقاً)');
+        return;
+      }
+      window.__appInitialized = true;
+
       log('🟢 init(): بدء التهيئة');
 
       this.theme = loadTheme();
@@ -815,14 +825,25 @@ log('✅ window.app جاهز');
 
 // ============================================================
 //  تحميل Alpine.js
-//  نتركه يبدأ تلقائياً — لا نستدعي .start() يدوياً
-//  window.app معرَّف قبله، فيجده Alpine جاهزاً
+//  ننتظر DOM + Alpine معاً ثم نبدأ Alpine يدوياً
 // ============================================================
 log('⏳ بدء تحميل Alpine.js...');
 
-import('https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/module.esm.js')
-  .then(() => {
-    log('🚀 Alpine.js تم تحميله وبدأ تلقائياً');
+Promise.all([
+  import('https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/module.esm.js'),
+  new Promise(resolve => {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', resolve, { once: true });
+    } else {
+      resolve();
+    }
+  })
+])
+  .then(([mod]) => {
+    log('✅ Alpine.js تم تحميله');
+    window.Alpine = mod.default;
+    window.Alpine.start();
+    log('🚀 Alpine.start() — التطبيق بدأ');
   })
   .catch(err => {
     console.error('🔴 فشل تحميل Alpine:', err);
