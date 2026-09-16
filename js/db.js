@@ -97,43 +97,47 @@ export async function initDB() {
 //  ترحيل: فحص البنية القديمة وحذف الجداول غير المتوافقة
 //  ملاحظة: نفقد البيانات القديمة، لكنها كانت ببنية غير صالحة
 // ============================================================
+// ============================================================
+//  ترحيل: حذف الجداول القديمة غير المتوافقة
+//  نبسّط الفحص: نحاول SELECT، إذا فشل → نحذف الجدول
+// ============================================================
 async function migrateSchema() {
   // فحص teachers.is_active
   try {
     await db.query('SELECT is_active FROM teachers LIMIT 0');
+    // نجح → الجدول بالبنية الجديدة
   } catch {
-    // إما الجدول غير موجود، أو العمود غير موجود
-    // نتحقق هل الجدول موجود فعلاً
+    console.log('🔄 Migration: resetting teachers table (missing is_active)');
     try {
-      const r = await db.query(`
-        SELECT EXISTS (
-          SELECT FROM information_schema.tables 
-          WHERE table_name = 'teachers'
-        ) as exists
-      `);
-      if (r.rows[0].exists) {
-        console.log('🔄 Migration: dropping old teachers table');
-        await db.exec('DROP TABLE IF EXISTS teachers CASCADE');
-      }
-    } catch {}
+      await db.exec('DROP TABLE IF EXISTS teachers CASCADE');
+    } catch (e) {
+      console.warn('Drop teachers warning:', e.message);
+    }
   }
 
   // فحص attendance.date_hijri
   try {
     await db.query('SELECT date_hijri FROM attendance LIMIT 0');
+    // نجح → الجدول بالبنية الجديدة
   } catch {
+    console.log('🔄 Migration: resetting attendance table (missing date_hijri)');
     try {
-      const r = await db.query(`
-        SELECT EXISTS (
-          SELECT FROM information_schema.tables 
-          WHERE table_name = 'attendance'
-        ) as exists
-      `);
-      if (r.rows[0].exists) {
-        console.log('🔄 Migration: dropping old attendance table');
-        await db.exec('DROP TABLE IF EXISTS attendance CASCADE');
-      }
-    } catch {}
+      await db.exec('DROP TABLE IF EXISTS attendance CASCADE');
+    } catch (e) {
+      console.warn('Drop attendance warning:', e.message);
+    }
+  }
+
+  // فحص academic_days — إذا لم يوجد، سيُنشأ لاحقاً
+  try {
+    await db.query('SELECT date_hijri FROM academic_days LIMIT 0');
+  } catch {
+    console.log('🔄 Migration: resetting academic_days table');
+    try {
+      await db.exec('DROP TABLE IF EXISTS academic_days CASCADE');
+    } catch (e) {
+      console.warn('Drop academic_days warning:', e.message);
+    }
   }
 }
 
