@@ -1,13 +1,10 @@
-// ============================================================
-//  sw.js — Service Worker
-//  المسؤول عن تخزين ملفات التطبيق في الكاش للعمل بدون إنترنت
-// ============================================================
+// sw.js — يخزّن ملفات اللوحة والمكتبات الخارجية ليعمل التطبيق بلا إنترنت
+// عند أي تعديل على الملفات: غيّري رقم CACHE_NAME و RUNTIME_CACHE.
 
-// ⚠️ مهم: عند أي تعديل على ملفات التطبيق، غيّري رقم الإصدار
-//         من v5 إلى v6 مثلاً، ليتم إعادة تحميل الكاش الجديد
-const CACHE_NAME = 'school-dashboard-v5';
+const CACHE_NAME = 'school-dashboard-v2';
+const RUNTIME_CACHE = 'school-dashboard-runtime-v2';
 
-// قائمة الملفات التي سيتم تخزينها في الكاش
+// ملفات اللوحة (محلية) — لا بد من نجاحها كلها
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -15,95 +12,92 @@ const ASSETS_TO_CACHE = [
   './css/style.css',
   './js/app.js',
   './js/db.js',
-  './js/search.js',
-  './js/import.js',
-  './js/theme.js',
-  './js/export.js',
   './js/hijri.js',
   './js/attendance.js',
+  './js/schedule.js',
+  './js/search.js',
+  './js/import.js',
+  './js/export.js',
+  './js/theme.js',
   './icons/icon-192.png'
 ];
 
-// ============================================================
-//  حدث Install — يتم تشغيله عند أول تسجيل للـ Service Worker
-//  نقوم بتخزين كل الملفات في الكاش
-// ============================================================
-self.addEventListener('install', (event) => {
-  console.log('🔧 Service Worker: Installing...');
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('📦 Caching all assets');
-        return cache.addAll(ASSETS_TO_CACHE);
-      })
-      .then(() => self.skipWaiting()) // تفعيل فوري بدون انتظار إغلاق التبويبات
-  );
+// المكتبات الخارجية — تُخزّن أثناء التثبيت حتى يعمل التطبيق بلا إنترنت من المرة الثانية.
+// ملاحظة: أسماء ملفات chunk مرتبطة بإصدار PGlite 0.2.17 المثبّت في js/db.js.
+const CDN_ASSETS = [
+  'https://cdn.jsdelivr.net/npm/@electric-sql/pglite@0.2.17/dist/index.js',
+  'https://cdn.jsdelivr.net/npm/@electric-sql/pglite@0.2.17/dist/chunk-A7RFOIQ7.js',
+  'https://cdn.jsdelivr.net/npm/@electric-sql/pglite@0.2.17/dist/chunk-EADU5A67.js',
+  'https://cdn.jsdelivr.net/npm/@electric-sql/pglite@0.2.17/dist/chunk-WGR4JCLS.js',
+  'https://cdn.jsdelivr.net/npm/@electric-sql/pglite@0.2.17/dist/chunk-STOZMFXW.js',
+  'https://cdn.jsdelivr.net/npm/@electric-sql/pglite@0.2.17/dist/chunk-BTBUZ646.js',
+  'https://cdn.jsdelivr.net/npm/@electric-sql/pglite@0.2.17/dist/postgres.wasm',
+  'https://cdn.jsdelivr.net/npm/@electric-sql/pglite@0.2.17/dist/postgres.data',
+  'https://cdn.jsdelivr.net/npm/minisearch@7.1.0/dist/es/index.js',
+  'https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/module.esm.js'
+];
+
+// كل عنوان على حدة: فشل أحدها (انقطاع الشبكة) لا يُفشل التثبيت كله
+async function precacheCdn() {
+  const cache = await caches.open(RUNTIME_CACHE);
+  await Promise.all(CDN_ASSETS.map(async url => {
+    try {
+      const existing = await cache.match(url);
+      if (existing) return;
+      const res = await fetch(url, { mode: 'cors', credentials: 'omit' });
+      if (res && (res.status === 200 || res.type === 'opaque')) await cache.put(url, res.clone());
+    } catch (e) { /* بلا إنترنت أثناء التثبيت: ستُخزَّن لاحقاً عند أول طلب ناجح لها */ }
+  }));
+}
+
+self.addEventListener('install', event => {
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.addAll(ASSETS_TO_CACHE);
+    await precacheCdn();
+    await self.skipWaiting();
+  })());
 });
 
-// ============================================================
-//  حدث Activate — يتم تشغيله عند تنشيط Service Worker جديد
-//  نحذف الكاشات القديمة (v1، v2، v3، v4)
-// ============================================================
-self.addEventListener('activate', (event) => {
-  console.log('✅ Service Worker: Activating...');
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('🗑️ Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    }).then(() => self.clients.claim()) // السيطرة على كل التبويبات المفتوحة
-  );
+self.addEventListener('activate', event => {
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys
+      .filter(k => k !== CACHE_NAME && k !== RUNTIME_CACHE)
+      .map(k => caches.delete(k)));
+    await self.clients.claim();
+  })());
 });
 
-// ============================================================
-//  حدث Fetch — يتم تشغيله عند كل طلب من الصفحة
-//  نتحقق أولاً من الكاش، وإن لم نجد الملف نجلبه من الشبكة
-// ============================================================
-self.addEventListener('fetch', (event) => {
-  // نتجاهل الطلبات غير GET (مثل POST)
-  if (event.request.method !== 'GET') return;
+async function handleRequest(request, url) {
+  const cached = await caches.match(request, { ignoreSearch: url.origin !== self.location.origin });
+  if (cached) return cached;
 
-  // نتجاهل الطلبات من نطاقات خارجية (مثل CDN)
-  const url = new URL(event.request.url);
-  if (url.origin !== self.location.origin) {
-    return;
+  try {
+    const response = await fetch(request);
+    const cacheable = response && (response.status === 200 || response.type === 'opaque');
+    if (cacheable) {
+      const copy = response.clone();
+      const target = url.origin === self.location.origin ? CACHE_NAME : RUNTIME_CACHE;
+      caches.open(target).then(cache => cache.put(request, copy)).catch(() => {});
+    }
+    return response;
+  } catch (e) {
+    // بلا إنترنت وبلا نسخة مخزّنة
+    if (request.mode === 'navigate') {
+      const fallback = await caches.match('./index.html');
+      if (fallback) return fallback;
+    }
+    return new Response('', { status: 504, statusText: 'غير متصل' });
   }
+}
 
-  event.respondWith(
-    caches.match(event.request)
-      .then(cachedResponse => {
-        // إذا وُجد في الكاش، نرجعه فورًا
-        if (cachedResponse) {
-          return cachedResponse;
-        }
+self.addEventListener('fetch', event => {
+  const request = event.request;
+  if (request.method !== 'GET') return;
 
-        // وإلا نجلبه من الشبكة ونخزنه ديناميكيًا
-        return fetch(event.request)
-          .then(networkResponse => {
-            // نتأكد أن الرد صالح قبل التخزين
-            if (!networkResponse || networkResponse.status !== 200) {
-              return networkResponse;
-            }
+  const url = new URL(request.url);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
 
-            const responseClone = networkResponse.clone();
-            caches.open(CACHE_NAME).then(cache => {
-              cache.put(event.request, responseClone);
-            });
-
-            return networkResponse;
-          })
-          .catch(() => {
-            // في حال فشل الشبكة وعدم وجود الملف في الكاش،
-            // نرجع الصفحة الرئيسية كـ fallback
-            if (event.request.destination === 'document') {
-              return caches.match('./index.html');
-            }
-          });
-      })
-  );
+  event.respondWith(handleRequest(request, url));
 });

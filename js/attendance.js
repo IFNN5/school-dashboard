@@ -1,806 +1,559 @@
-// ============================================================
-//  attendance.js — منطق الحضور والتقارير وتوليد PDF
-//  - دوال مساعدة للحالات
-//  - إحصائيات وحسابات
-//  - توليد تقارير PDF بجدول بسيط (عبر طباعة المتصفح)
-// ============================================================
+// attendance.js — منطق الحضور والإحصاءات وتوليد التقارير للطباعة (PDF عبر window.print)
 
+import * as db from './db.js';
 import {
-  ATTENDANCE_STATUSES,
-  STATUSES_NEEDING_TIME,
-  STATUSES_COUNTING_AS_ABSENCE,
-  STATUSES_WITH_EXCUSE,
-  getAttendanceByDate,
-  saveAttendanceBulk,
-  getAttendanceHistory,
-  getTeacherStats,
-  getGeneralStats,
-  getTeachersRankedByAbsence,
-  getHolidays,
-  setHoliday,
-  removeHoliday,
-  getDayStatus,
-  getAllTeachers
-} from './db.js';
-
-import {
-  toHijri,
-  toGregorian,
-  getCurrentHijri,
-  formatHijri,
-  formatHijriShort,
-  formatGregorianShort,
-  hijriToKey,
-  keyToHijri,
-  getWeekdayAr,
-  isWorkingDay,
-  addDaysToHijri,
-  HIJRI_MONTHS_AR,
-  WEEKDAYS_AR
+  toHijri, toGregorian, getCurrentHijri, hijriToKey, keyToHijri,
+  formatHijri, formatHijriShort, formatGregorianShort, toISODate,
+  getWeekdayAr, isWorkingDay, addDaysToHijri, getHijriMonthRange,
+  HIJRI_MONTHS_AR
 } from './hijri.js';
 
-// ============================================================
-//  إعادة تصدير الحالات (لتسهيل الاستيراد في app.js)
-// ============================================================
-export {
-  ATTENDANCE_STATUSES,
-  STATUSES_NEEDING_TIME,
-  STATUSES_COUNTING_AS_ABSENCE,
-  STATUSES_WITH_EXCUSE
+/* ------------------------------------------------------------------ */
+/* الثوابت                                                             */
+/* ------------------------------------------------------------------ */
+
+export const ATTENDANCE_STATUSES = {
+  present:          'حاضرة',
+  late:             'متأخرة',
+  excused:          'استئذان',
+  sick_leave:       'إجازة مرضية',
+  absent:           'غياب بدون عذر',
+  official_leave:   'إجازة رسمية',
+  official_mission: 'مهمة رسمية'
 };
 
-// ============================================================
-//  دوال مساعدة للحالات
-// ============================================================
+export const STATUS_COLORS = {
+  present:          '#16a34a',
+  late:             '#f59e0b',
+  excused:          '#0ea5e9',
+  sick_leave:       '#8b5cf6',
+  absent:           '#dc2626',
+  official_leave:   '#64748b',
+  official_mission: '#0891b2'
+};
 
-/**
- * هل الحالة تحتاج إلى وقت؟
- */
-export function needsTime(status) {
-  return STATUSES_NEEDING_TIME.includes(status);
-}
+export const NEEDS_TIME = ['late', 'excused'];
+export const COUNTS_AS_ABSENCE = ['sick_leave', 'absent'];
+export const HAS_EXCUSE = ['sick_leave', 'excused', 'official_leave', 'official_mission'];
 
-/**
- * هل الحالة تُحسب كغياب؟
- */
-export function countsAsAbsence(status) {
-  return STATUSES_COUNTING_AS_ABSENCE.includes(status);
-}
+/* ------------------------------------------------------------------ */
+/* مساعدات الحالات                                                     */
+/* ------------------------------------------------------------------ */
 
-/**
- * هل الحالة بعذر؟
- */
-export function hasExcuse(status) {
-  return STATUSES_WITH_EXCUSE.includes(status);
-}
-
-/**
- * الحصول على لون الحالة (للاستخدام في الواجهة)
- */
-export function getStatusColor(status) {
-  const colors = {
-    present:          '#16a34a',
-    late:             '#f59e0b',
-    excused:          '#0ea5e9',
-    sick_leave:       '#8b5cf6',
-    absent:           '#dc2626',
-    official_leave:   '#64748b',
-    official_mission: '#0891b2'
-  };
-  return colors[status] || '#64748b';
-}
-
-/**
- * الحصول على قائمة الحالات (للاختيار في الواجهة)
- */
 export function getStatusList() {
   return Object.entries(ATTENDANCE_STATUSES).map(([key, label]) => ({
-    key,
-    label,
-    needsTime: needsTime(key),
-    isAbsence: countsAsAbsence(key),
-    hasExcuse: hasExcuse(key),
-    color: getStatusColor(key)
+    key, label, color: STATUS_COLORS[key], needsTime: NEEDS_TIME.includes(key)
   }));
 }
 
-// ============================================================
-//  توليد مفتاح تاريخ اليوم الهجري
-// ============================================================
+export function getStatusLabel(key) {
+  return ATTENDANCE_STATUSES[key] || '—';
+}
+
+export function getStatusColor(key) {
+  return STATUS_COLORS[key] || '#94a3b8';
+}
+
+export function needsTime(key) {
+  return NEEDS_TIME.includes(key);
+}
+
+export function countsAsAbsence(key) {
+  return COUNTS_AS_ABSENCE.includes(key);
+}
+
+export function hasExcuse(key) {
+  return HAS_EXCUSE.includes(key);
+}
+
+/* ------------------------------------------------------------------ */
+/* التواريخ                                                            */
+/* ------------------------------------------------------------------ */
+
 export function todayHijriKey() {
   return hijriToKey(getCurrentHijri());
 }
 
-// ============================================================
-//  تنقّل بين الأيام (السابق/التالي)
-//  @param {string} dateHijriKey — مفتاح التاريخ الحالي
-//  @param {number} delta — عدد الأيام (موجب أو سالب)
-//  @returns {string} مفتاح التاريخ الجديد
-// ============================================================
-export function navigateDay(dateHijriKey, delta) {
-  const hijri = keyToHijri(dateHijriKey);
-  const newHijri = addDaysToHijri(hijri, delta);
-  return hijriToKey(newHijri);
+/** التنقل بين الأيام: delta بالأيام. يُعيد معلومات اليوم الجديد. */
+export function navigateDay(dateKey, delta) {
+  const hijri = addDaysToHijri(keyToHijri(dateKey), delta);
+  return describeDay(hijriToKey(hijri));
 }
 
-// ============================================================
-//  التحقق: هل يوم معين هو يوم دراسي؟
-//  - ليس جمعة ولا سبت
-//  - ليس إجازة مسجّلة
-// ============================================================
-export async function checkWorkingDay(dateHijriKey) {
-  const hijri = keyToHijri(dateHijriKey);
-  const greg = toGregorian(hijri.year, hijri.month, hijri.day);
+/** وصف كامل لليوم: مفاتيح + نصوص معروضة */
+export function describeDay(dateKey) {
+  const hijri = keyToHijri(dateKey);
+  const gregorian = toGregorian(hijri.year, hijri.month, hijri.day);
+  return {
+    key: dateKey,
+    hijri,
+    gregorian,
+    gregorianISO: toISODate(gregorian),
+    hijriLong: formatHijri(hijri, { withWeekday: gregorian }),
+    hijriShort: formatHijriShort(hijri),
+    gregorianLong: formatGregorianShort(gregorian),
+    weekday: getWeekdayAr(gregorian),
+    isWorkingDay: isWorkingDay(gregorian)
+  };
+}
 
-  // تحقق من الجمعة/السبت
-  if (!isWorkingDay(greg)) {
-    return { isWorking: false, reason: 'نهاية الأسبوع' };
-  }
+export function checkWorkingDay(dateKey) {
+  return describeDay(dateKey).isWorkingDay;
+}
 
-  // تحقق من الإجازات المسجّلة
-  const holiday = await getDayStatus(dateHijriKey);
-  if (holiday && holiday.is_holiday) {
+/** نطاق الشهر الهجري الحالي — مفيد كفترة افتراضية للتقارير */
+export function getCurrentHijriMonthRange() {
+  const h = getCurrentHijri();
+  return { ...getHijriMonthRange(h.year, h.month), year: h.year, month: h.month,
+           label: `${HIJRI_MONTHS_AR[h.month - 1]} ${h.year}هـ` };
+}
+
+/* ------------------------------------------------------------------ */
+/* كشف اليوم                                                           */
+/* ------------------------------------------------------------------ */
+
+/** يبني كشف التسجيل ليوم: كل معلمة نشطة + حالتها المحفوظة إن وُجدت */
+export async function getDayRoster(dateKey) {
+  const [teachers, records, dayStatus] = await Promise.all([
+    db.getAllTeachers(false),
+    db.getAttendanceByDate(dateKey),
+    db.getDayStatus(dateKey)
+  ]);
+
+  const byTeacher = new Map(records.map(r => [r.teacher_id, r]));
+
+  const roster = teachers.map(t => {
+    const rec = byTeacher.get(t.id);
     return {
-      isWorking: false,
-      reason: holiday.holiday_name || 'إجازة',
-      holiday: holiday
+      teacher_id: t.id,
+      name: t.name,
+      specialty: t.specialty || '',
+      status: rec ? rec.status : null,
+      time: rec && rec.time ? rec.time : '',
+      note: rec && rec.note ? rec.note : '',
+      saved: !!rec
     };
-  }
-
-  return { isWorking: true, reason: null };
-}
-
-// ============================================================
-//  جلب بيانات اليوم الكاملة (للتسجيل الجماعي)
-//  @returns {Array} [{ teacher, attendance }]
-//  - teacher: بيانات المعلمة
-//  - attendance: سجل الحضور إن وُجد
-// ============================================================
-export async function getDayRoster(dateHijriKey) {
-  const teachers = await getAllTeachers(false); // النشطات فقط
-  const attendanceRecords = await getAttendanceByDate(dateHijriKey);
-
-  // فهرس سريع
-  const attendanceMap = {};
-  attendanceRecords.forEach(a => {
-    attendanceMap[a.teacher_id] = a;
   });
 
-  return teachers.map(t => ({
-    teacher: t,
-    attendance: attendanceMap[t.id] || null
-  }));
+  return { roster, dayStatus, day: describeDay(dateKey) };
 }
 
-// ============================================================
-//  حفظ تسجيل جماعي
-//  @param {string} dateHijriKey
-//  @param {Array} records — [{ teacher_id, status, time, note }]
-// ============================================================
-export async function saveDayAttendance(dateHijriKey, records) {
-  const hijri = keyToHijri(dateHijriKey);
-  const greg = toGregorian(hijri.year, hijri.month, hijri.day);
-  const dateGregorian = formatGregorianShort(greg);
+/** حفظ كشف اليوم — يتجاهل من ليس له حالة، ويحذف سجلات مَن أُلغيت حالتها */
+export async function saveDayAttendance(dateKey, rows) {
+  const day = describeDay(dateKey);
+  const toSave = [];
+  const toDelete = [];
 
-  const rows = records.map(r => ({
-    teacher_id: r.teacher_id,
-    date_hijri: dateHijriKey,
-    date_gregorian: dateGregorian,
-    status: r.status,
-    time: r.time || null,
-    note: r.note || null
-  }));
-
-  return await saveAttendanceBulk(rows);
-}
-
-// ============================================================
-//  حساب نطاق تاريخي للشهر الحالي الهجري
-//  @returns {{ from: string, to: string, year: number, month: number }}
-// ============================================================
-export function getCurrentHijriMonthRange() {
-  const today = getCurrentHijri();
-  const year = today.year;
-  const month = today.month;
-
-  // أول يوم في الشهر
-  const first = { year, month, day: 1 };
-
-  // آخر يوم في الشهر
-  let lastDay = 30;
-  const test = toGregorian(year, month, 30);
-  if (test.getMonth() !== toGregorian(year, month, 1).getMonth()) {
-    lastDay = 29;
+  for (const row of rows) {
+    if (row.status) {
+      toSave.push({
+        teacher_id: row.teacher_id,
+        date_hijri: dateKey,
+        date_gregorian: day.gregorianISO,
+        status: row.status,
+        time: needsTime(row.status) ? (row.time || null) : null,
+        note: row.note || null
+      });
+    } else if (row.saved) {
+      toDelete.push(row.teacher_id);
+    }
   }
 
-  return {
-    from: hijriToKey(first),
-    to: hijriToKey({ year, month, day: lastDay }),
-    year,
-    month,
-    label: `${HIJRI_MONTHS_AR[month - 1]} ${year}`
-  };
+  for (const id of toDelete) await db.deleteAttendance(id, dateKey);
+  if (toSave.length) await db.saveAttendanceBulk(toSave);
+
+  return { saved: toSave.length, removed: toDelete.length };
 }
 
-// ============================================================
-//  حساب نسبة الحضور من إحصائيات
-// ============================================================
-export function calculatePresenceRate(stats) {
-  if (stats.total === 0) return 0;
-  const present = stats.present + stats.late + stats.excused +
-                  stats.official_leave + stats.official_mission;
-  return Math.round((present / stats.total) * 100);
+/** التحقق قبل الحفظ */
+export function validateRoster(rows) {
+  const missingStatus = rows.filter(r => !r.status);
+  const missingTime = rows.filter(r => r.status && needsTime(r.status) && !r.time);
+  return { missingStatus, missingTime, ok: missingTime.length === 0 };
 }
 
-// ============================================================
-//  ملخص للعرض في البطاقات
-//  @param {Object} stats — من getGeneralStats أو getTeacherStats
-// ============================================================
-export function summarizeStats(stats) {
-  return {
-    present: stats.present || 0,
-    late: stats.late || 0,
-    excused: stats.excused || 0,
-    sick_leave: stats.sick_leave || 0,
-    absent: stats.absent || 0,
-    official_leave: stats.official_leave || 0,
-    official_mission: stats.official_mission || 0,
-    totalAbsences: (stats.absent || 0) + (stats.sick_leave || 0),
-    totalWithExcuse: (stats.sick_leave || 0) + (stats.excused || 0) +
-                     (stats.official_leave || 0) + (stats.official_mission || 0),
-    presenceRate: calculatePresenceRate(stats),
-    total: stats.total || 0
-  };
+/* ------------------------------------------------------------------ */
+/* الإحصاءات                                                           */
+/* ------------------------------------------------------------------ */
+
+/** ملخص كشف اليوم: عدّاد لكل حالة + غير المسجّلات */
+export function summarizeStats(rows) {
+  const counts = { unrecorded: 0 };
+  for (const key of Object.keys(ATTENDANCE_STATUSES)) counts[key] = 0;
+
+  for (const r of rows) {
+    if (r.status && counts[r.status] !== undefined) counts[r.status]++;
+    else counts.unrecorded++;
+  }
+
+  counts.total = rows.length;
+  counts.recorded = counts.total - counts.unrecorded;
+  counts.absenceTotal = COUNTS_AS_ABSENCE.reduce((s, k) => s + counts[k], 0);
+  return counts;
 }
 
-// ============================================================
-//  ============ توليد تقارير PDF ============
-//  نستخدم طباعة المتصفح لضمان ظهور العربية بشكل مثالي
-// ============================================================
+/** نسبة الحضور: (حاضرة + متأخرة) ÷ السجلات المسجّلة */
+export function calculatePresenceRate(counts) {
+  const recorded = counts.recorded || 0;
+  if (!recorded) return 0;
+  const attended = (counts.present || 0) + (counts.late || 0);
+  return Math.round((attended / recorded) * 1000) / 10;
+}
 
-/**
- * توليد تقرير PDF بجدول بسيط
- * @param {Object} options
- *   - title: عنوان التقرير
- *   - subtitle: عنوان فرعي (اختياري)
- *   - columns: [{ key, label, width? }]
- *   - rows: [{ col_key: value, ... }]
- *   - summary: (اختياري) كائن بملخص يُعرض أعلى الجدول
- *   - meta: (اختياري) معلومات إضافية [{ label, value }]
- */
-export function generatePDFReport(options) {
-  const {
-    title = 'تقرير',
-    subtitle = '',
-    columns = [],
-    rows = [],
-    summary = null,
-    meta = []
-  } = options;
+/* ------------------------------------------------------------------ */
+/* التقارير — HTML مضمّن يُفتح في نافذة جديدة ثم window.print()         */
+/* ------------------------------------------------------------------ */
 
-  if (!columns.length) {
-    alert('لا توجد أعمدة للتقرير');
-    return;
-  }
+function esc(v) {
+  return String(v === null || v === undefined ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 
-  const now = new Date();
-  const hijri = getCurrentHijri();
-  const hijriStr = formatHijri(hijri);
-  const gregStr = formatGregorianShort(now);
+function statusBadge(status) {
+  if (!status) return '<span class="badge badge-none">لم تُسجَّل</span>';
+  return `<span class="badge" style="background:${getStatusColor(status)}">${esc(getStatusLabel(status))}</span>`;
+}
 
-  // بناء صفوف الجدول
-  const headerHTML = columns
-    .map(c => `<th${c.width ? ` style="width:${c.width}"` : ''}>${escapeHTML(c.label)}</th>`)
-    .join('');
-
-  const bodyHTML = rows
-    .map(row => {
-      const cells = columns.map(c => {
-        const value = row[c.key];
-        return `<td>${escapeHTML(value === null || value === undefined ? '—' : String(value))}</td>`;
-      }).join('');
-      return `<tr>${cells}</tr>`;
-    })
-    .join('');
-
-  // بطاقة الملخص
-  let summaryHTML = '';
-  if (summary && Array.isArray(summary)) {
-    summaryHTML = `
-      <div class="summary">
-        ${summary.map(s => `
-          <div class="summary-card">
-            <div class="summary-value">${escapeHTML(String(s.value))}</div>
-            <div class="summary-label">${escapeHTML(s.label)}</div>
-          </div>
-        `).join('')}
-      </div>
-    `;
-  }
-
-  // بطاقات المعلومات الإضافية
-  let metaHTML = '';
-  if (meta && meta.length > 0) {
-    metaHTML = `
-      <div class="meta">
-        ${meta.map(m => `
-          <div class="meta-item">
-            <span class="meta-label">${escapeHTML(m.label)}:</span>
-            <span class="meta-value">${escapeHTML(String(m.value))}</span>
-          </div>
-        `).join('')}
-      </div>
-    `;
-  }
-
-  // صفحة HTML كاملة
-  const html = `
-<!DOCTYPE html>
+function reportShell({ title, subtitle, body, orientation = 'landscape' }) {
+  return `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <title>${escapeHTML(title)}</title>
-  <style>
-    @page {
-      size: A4 landscape;
-      margin: 15mm 12mm;
-    }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: 'Segoe UI', Tahoma, 'Arial', sans-serif;
-      direction: rtl;
-      text-align: right;
-      color: #1e293b;
-      background: #ffffff;
-      font-size: 11pt;
-      padding: 10px;
-    }
-
-    .header {
-      text-align: center;
-      border-bottom: 2px solid #2563eb;
-      padding-bottom: 12px;
-      margin-bottom: 20px;
-    }
-
-    .header h1 {
-      font-size: 20pt;
-      color: #1e293b;
-      margin-bottom: 6px;
-    }
-
-    .header .subtitle {
-      font-size: 12pt;
-      color: #64748b;
-      margin-bottom: 8px;
-    }
-
-    .header .dates {
-      font-size: 10pt;
-      color: #64748b;
-    }
-
-    .header .dates span {
-      margin: 0 8px;
-    }
-
-    .meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 15px;
-      margin-bottom: 15px;
-      padding: 10px 15px;
-      background: #f8fafc;
-      border-radius: 6px;
-      border-right: 3px solid #2563eb;
-    }
-
-    .meta-item {
-      font-size: 10pt;
-    }
-
-    .meta-label {
-      color: #64748b;
-      font-weight: 600;
-      margin-left: 5px;
-    }
-
-    .meta-value {
-      color: #1e293b;
-    }
-
-    .summary {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-
-    .summary-card {
-      flex: 1;
-      min-width: 100px;
-      padding: 12px;
-      background: #f8fafc;
-      border-radius: 6px;
-      text-align: center;
-      border-top: 3px solid #2563eb;
-    }
-
-    .summary-value {
-      font-size: 18pt;
-      font-weight: 700;
-      color: #1e293b;
-      margin-bottom: 4px;
-    }
-
-    .summary-label {
-      font-size: 9pt;
-      color: #64748b;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-      font-size: 10pt;
-    }
-
-    thead {
-      background: #2563eb;
-      color: #ffffff;
-    }
-
-    th {
-      padding: 8px 10px;
-      text-align: right;
-      font-weight: 600;
-      border: 1px solid #1e40af;
-    }
-
-    td {
-      padding: 7px 10px;
-      text-align: right;
-      border: 1px solid #cbd5e1;
-    }
-
-    tbody tr:nth-child(even) {
-      background: #f8fafc;
-    }
-
-    tbody tr:hover {
-      background: #e2e8f0;
-    }
-
-    .footer {
-      margin-top: 20px;
-      padding-top: 10px;
-      border-top: 1px solid #cbd5e1;
-      text-align: center;
-      font-size: 9pt;
-      color: #94a3b8;
-    }
-
-    .empty-row {
-      text-align: center;
-      color: #94a3b8;
-      padding: 20px;
-      font-style: italic;
-    }
-
-    @media print {
-      body { padding: 0; }
-      .summary-card { break-inside: avoid; }
-      tr { break-inside: avoid; }
-    }
-  </style>
+<meta charset="utf-8">
+<title>${esc(title)}</title>
+<style>
+  @page { size: A4 ${orientation}; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Tahoma, system-ui, sans-serif;
+    direction: rtl; color: #1e293b; margin: 0; padding: 18px;
+    background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  header { border-bottom: 2px solid #1e293b; padding-bottom: 10px; margin-bottom: 16px; }
+  h1 { font-size: 19px; margin: 0 0 4px; }
+  .sub { font-size: 12px; color: #64748b; }
+  h2 { font-size: 14px; margin: 20px 0 8px; padding-right: 8px; border-right: 3px solid #2563eb; }
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; margin-bottom: 14px; }
+  th, td { border: 1px solid #cbd5e1; padding: 5px 7px; text-align: right; vertical-align: top; }
+  th { background: #f1f5f9; font-weight: 600; }
+  tbody tr:nth-child(even) td { background: #fafbfc; }
+  .badge { color: #fff; padding: 2px 8px; border-radius: 999px; font-size: 10.5px; white-space: nowrap; display: inline-block; }
+  .badge-none { background: #94a3b8; }
+  .cards { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .card { border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 14px; min-width: 104px; }
+  .card .n { font-size: 20px; font-weight: 700; line-height: 1.2; }
+  .card .l { font-size: 11px; color: #64748b; }
+  .num { font-variant-numeric: tabular-nums; }
+  .muted { color: #64748b; }
+  .empty { padding: 26px; text-align: center; color: #64748b; border: 1px dashed #cbd5e1; border-radius: 8px; }
+  footer { margin-top: 18px; padding-top: 8px; border-top: 1px solid #cbd5e1;
+           font-size: 10.5px; color: #64748b; display: flex; justify-content: space-between; }
+  .sign { margin-top: 30px; display: flex; gap: 60px; font-size: 12px; }
+  .sign div { flex: 1; }
+  .sign span { display: block; margin-top: 30px; border-top: 1px solid #94a3b8; padding-top: 4px; }
+  @media print { .noprint { display: none !important; } }
+</style>
 </head>
 <body>
-  <div class="header">
-    <h1>${escapeHTML(title)}</h1>
-    ${subtitle ? `<div class="subtitle">${escapeHTML(subtitle)}</div>` : ''}
-    <div class="dates">
-      <span>${escapeHTML(hijriStr)} هـ</span>
-      <span>|</span>
-      <span>${escapeHTML(gregStr)} م</span>
-    </div>
-  </div>
-
-  ${metaHTML}
-  ${summaryHTML}
-
-  <table>
-    <thead>
-      <tr>${headerHTML}</tr>
-    </thead>
-    <tbody>
-      ${rows.length > 0
-        ? bodyHTML
-        : `<tr><td colspan="${columns.length}" class="empty-row">لا توجد بيانات للعرض</td></tr>`}
-    </tbody>
-  </table>
-
-  <div class="footer">
-    تم إنشاء هذا التقرير تلقائيًا من نظام لوحة وكيلة المعلمات
-  </div>
-
-  <script>
-    window.addEventListener('load', () => {
-      setTimeout(() => window.print(), 300);
-    });
-  <\/script>
+<header>
+  <h1>${esc(title)}</h1>
+  <div class="sub">${subtitle || ''}</div>
+</header>
+${body}
+<footer>
+  <span>لوحة وكيلة المعلمات</span>
+  <span>طُبع في ${esc(formatHijriShort(getCurrentHijri()))}هـ</span>
+</footer>
+<script>
+  window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 350); });
+<\/script>
 </body>
-</html>
-  `;
+</html>`;
+}
 
-  // فتح نافذة جديدة لعرض التقرير
-  const printWindow = window.open('', '_blank', 'width=1100,height=800');
-  if (!printWindow) {
-    alert('الرجاء السماح بالنوافذ المنبثقة لطباعة التقرير');
-    return;
+/** فتح التقرير في نافذة جديدة وتشغيل الطباعة */
+export function generatePDFReport(html, fallbackTitle = 'تقرير') {
+  const win = window.open('', '_blank');
+  if (!win) {
+    alert('تعذّر فتح نافذة التقرير. يرجى السماح بالنوافذ المنبثقة لهذا الموقع.');
+    return false;
   }
-  printWindow.document.open();
-  printWindow.document.write(html);
-  printWindow.document.close();
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+  win.document.title = fallbackTitle;
+  return true;
 }
 
-// ============================================================
-//  توليد تقرير يومي
-//  @param {string} dateHijriKey
-// ============================================================
-export async function generateDailyReport(dateHijriKey) {
-  const roster = await getDayRoster(dateHijriKey);
-  const hijri = keyToHijri(dateHijriKey);
-  const greg = toGregorian(hijri.year, hijri.month, hijri.day);
-  const hijriLabel = formatHijri(hijri);
-  const weekday = getWeekdayAr(greg);
+function statCards(counts) {
+  const items = [
+    ['حاضرة', counts.present, STATUS_COLORS.present],
+    ['متأخرة', counts.late, STATUS_COLORS.late],
+    ['استئذان', counts.excused, STATUS_COLORS.excused],
+    ['إجازة مرضية', counts.sick_leave, STATUS_COLORS.sick_leave],
+    ['غياب بدون عذر', counts.absent, STATUS_COLORS.absent],
+    ['إجازة رسمية', counts.official_leave, STATUS_COLORS.official_leave],
+    ['مهمة رسمية', counts.official_mission, STATUS_COLORS.official_mission],
+    ['لم تُسجَّل', counts.unrecorded, '#94a3b8']
+  ];
+  return `<div class="cards">${items.map(([label, n, color]) => `
+    <div class="card" style="border-top:3px solid ${color}">
+      <div class="n num">${n || 0}</div><div class="l">${label}</div>
+    </div>`).join('')}</div>`;
+}
 
-  // بناء صفوف التقرير
-  const rows = roster.map(item => ({
-    name: item.teacher.name,
-    specialty: item.teacher.specialty || '—',
-    status: item.attendance ? ATTENDANCE_STATUSES[item.attendance.status] : 'لم يُسجَّل',
-    time: item.attendance?.time || '—',
-    note: item.attendance?.note || '—'
-  }));
+/* --- 1) تقرير يومي --- */
 
-  // إحصائيات اليوم
-  const stats = {
-    present: 0, late: 0, excused: 0, sick_leave: 0,
-    absent: 0, official_leave: 0, official_mission: 0, notRecorded: 0
-  };
+export async function generateDailyReport(dateKey) {
+  const { roster, dayStatus, day } = await getDayRoster(dateKey);
+  const counts = summarizeStats(roster);
 
-  roster.forEach(item => {
-    if (!item.attendance) {
-      stats.notRecorded++;
-    } else {
-      stats[item.attendance.status]++;
-    }
-  });
+  const rows = roster.length ? roster.map((r, i) => `
+    <tr>
+      <td class="num">${i + 1}</td>
+      <td>${esc(r.name)}</td>
+      <td>${esc(r.specialty) || '<span class="muted">—</span>'}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td class="num">${esc(r.time) || '—'}</td>
+      <td>${esc(r.note) || ''}</td>
+    </tr>`).join('') : '';
 
-  generatePDFReport({
+  const holidayNote = dayStatus && dayStatus.is_holiday
+    ? `<p class="muted">هذا اليوم مسجَّل كإجازة: ${esc(dayStatus.holiday_name || 'بدون اسم')}</p>` : '';
+
+  const body = `
+    ${holidayNote}
+    ${statCards(counts)}
+    <p class="muted">نسبة الحضور: <strong class="num">${calculatePresenceRate(counts)}%</strong>
+       من أصل <span class="num">${counts.recorded}</span> سجلاً مسجّلاً.</p>
+    <h2>كشف اليوم</h2>
+    ${rows ? `<table>
+      <thead><tr><th style="width:36px">م</th><th>المعلمة</th><th>التخصص</th>
+        <th style="width:110px">الحالة</th><th style="width:70px">الوقت</th><th>ملاحظة</th></tr></thead>
+      <tbody>${rows}</tbody></table>`
+      : '<div class="empty">لا توجد معلمات نشطات لعرضها.</div>'}
+    <div class="sign"><div>وكيلة المعلمات<span></span></div><div>مديرة المدرسة<span></span></div></div>`;
+
+  return reportShell({
     title: 'تقرير الحضور اليومي',
-    subtitle: `${weekday} - ${hijriLabel} هـ`,
-    meta: [
-      { label: 'عدد المعلمات', value: roster.length },
-      { label: 'تم التسجيل', value: roster.length - stats.notRecorded },
-      { label: 'لم يُسجَّل', value: stats.notRecorded }
-    ],
-    summary: [
-      { label: 'حاضرة', value: stats.present },
-      { label: 'متأخرة', value: stats.late },
-      { label: 'استئذان', value: stats.excused },
-      { label: 'إجازة مرضية', value: stats.sick_leave },
-      { label: 'غياب بدون عذر', value: stats.absent },
-      { label: 'إجازة رسمية', value: stats.official_leave },
-      { label: 'مهمة رسمية', value: stats.official_mission }
-    ],
-    columns: [
-      { key: 'name', label: 'المعلمة', width: '22%' },
-      { key: 'specialty', label: 'التخصص', width: '15%' },
-      { key: 'status', label: 'الحالة', width: '18%' },
-      { key: 'time', label: 'الوقت', width: '10%' },
-      { key: 'note', label: 'ملاحظة', width: '35%' }
-    ],
-    rows
+    subtitle: `${esc(day.hijriLong)} — الموافق ${esc(day.gregorianLong)}`,
+    body
   });
 }
 
-// ============================================================
-//  توليد تقرير فترة لمعلمة
-// ============================================================
-export async function generateTeacherReport(teacherId, teacherName, fromKey, toKey) {
-  const stats = await getTeacherStats(teacherId, fromKey, toKey);
-  const fromHijri = keyToHijri(fromKey);
-  const toHijri = keyToHijri(toKey);
+/* --- 2) تقرير معلمة --- */
 
-  const summary = summarizeStats(stats);
+export async function generateTeacherReport(teacherId, from, to) {
+  const [teacher, stats] = await Promise.all([
+    db.getTeacher(teacherId),
+    db.getTeacherStats(teacherId, from, to)
+  ]);
 
-  generatePDFReport({
-    title: 'تقرير أداء معلمة',
-    subtitle: teacherName,
-    meta: [
-      { label: 'من', value: formatHijri(fromHijri) },
-      { label: 'إلى', value: formatHijri(toHijri) },
-      { label: 'إجمالي الأيام المسجّلة', value: stats.total }
-    ],
-    summary: [
-      { label: 'حاضرة', value: stats.present },
-      { label: 'متأخرة', value: stats.late },
-      { label: 'استئذان', value: stats.excused },
-      { label: 'إجازة مرضية', value: stats.sick_leave },
-      { label: 'غياب بدون عذر', value: stats.absent },
-      { label: 'إجازة رسمية', value: stats.official_leave },
-      { label: 'مهمة رسمية', value: stats.official_mission },
-      { label: 'نسبة الحضور', value: summary.presenceRate + '%' }
-    ],
-    columns: [
-      { key: 'status', label: 'الحالة', width: '40%' },
-      { key: 'count', label: 'العدد', width: '20%' },
-      { key: 'percent', label: 'النسبة', width: '40%' }
-    ],
-    rows: [
-      { status: 'حاضرة', count: stats.present, percent: pct(stats.present, stats.total) },
-      { status: 'متأخرة', count: stats.late, percent: pct(stats.late, stats.total) },
-      { status: 'استئذان', count: stats.excused, percent: pct(stats.excused, stats.total) },
-      { status: 'إجازة مرضية', count: stats.sick_leave, percent: pct(stats.sick_leave, stats.total) },
-      { status: 'غياب بدون عذر', count: stats.absent, percent: pct(stats.absent, stats.total) },
-      { status: 'إجازة رسمية', count: stats.official_leave, percent: pct(stats.official_leave, stats.total) },
-      { status: 'مهمة رسمية', count: stats.official_mission, percent: pct(stats.official_mission, stats.total) }
-    ]
+  if (!teacher) return reportShell({ title: 'تقرير معلمة', subtitle: '', body: '<div class="empty">المعلمة غير موجودة.</div>' });
+
+  const counts = { unrecorded: 0, ...Object.fromEntries(Object.keys(ATTENDANCE_STATUSES).map(k => [k, stats.byStatus[k] || 0])) };
+  counts.total = stats.total;
+  counts.recorded = stats.total;
+
+  const rows = stats.records.map((r, i) => `
+    <tr>
+      <td class="num">${i + 1}</td>
+      <td class="num">${esc(formatHijriShort(keyToHijri(r.date_hijri)))}</td>
+      <td>${esc(describeDay(r.date_hijri).weekday)}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td class="num">${esc(r.time) || '—'}</td>
+      <td>${esc(r.note) || ''}</td>
+    </tr>`).join('');
+
+  const body = `
+    <h2>بيانات المعلمة</h2>
+    <table>
+      <tbody>
+        <tr><th style="width:120px">الاسم</th><td>${esc(teacher.name)}</td>
+            <th style="width:120px">التخصص</th><td>${esc(teacher.specialty) || '—'}</td></tr>
+        <tr><th>الهاتف</th><td class="num">${esc(teacher.phone) || '—'}</td>
+            <th>البريد</th><td>${esc(teacher.email) || '—'}</td></tr>
+        <tr><th>تاريخ التعيين</th><td class="num">${esc(teacher.hire_date) || '—'}</td>
+            <th>الحالة</th><td>${teacher.is_active ? 'نشطة' : 'معطّلة'}</td></tr>
+      </tbody>
+    </table>
+
+    <h2>ملخص الفترة</h2>
+    ${statCards(counts)}
+    <p class="muted">نسبة الحضور: <strong class="num">${calculatePresenceRate(counts)}%</strong>
+      — مجموع أيام الغياب (مرضي + بدون عذر):
+      <strong class="num">${(counts.sick_leave || 0) + (counts.absent || 0)}</strong></p>
+
+    <h2>تفصيل السجلات</h2>
+    ${rows ? `<table>
+      <thead><tr><th style="width:36px">م</th><th style="width:100px">التاريخ الهجري</th>
+        <th style="width:80px">اليوم</th><th style="width:110px">الحالة</th>
+        <th style="width:70px">الوقت</th><th>ملاحظة</th></tr></thead>
+      <tbody>${rows}</tbody></table>`
+      : '<div class="empty">لا توجد سجلات في هذه الفترة.</div>'}`;
+
+  return reportShell({
+    title: `تقرير المعلمة: ${esc(teacher.name)}`,
+    subtitle: `الفترة من ${esc(from)} إلى ${esc(to)} هـ`,
+    body,
+    orientation: 'portrait'
   });
 }
 
-// ============================================================
-//  توليد تقرير عام للفترة (ترتيب بالأكثر غياباً)
-// ============================================================
-export async function generateGeneralReport(fromKey, toKey, fromLabel, toLabel) {
-  const ranked = await getTeachersRankedByAbsence(fromKey, toKey);
-  const stats = await getGeneralStats(fromKey, toKey);
-  const summary = summarizeStats(stats);
+/* --- 3) التقرير العام --- */
 
-  const rows = ranked.map(r => ({
-    name: r.teacher_name,
-    specialty: r.teacher_specialty || '—',
-    present: r.total_records - r.absences - r.sick_leaves - r.lates - r.excused,
-    late: r.lates,
-    excused: r.excused,
-    sick_leave: r.sick_leaves,
-    absent: r.absences,
-    totalAbsences: r.total_absences,
-    totalRecords: r.total_records
-  }));
+export async function generateGeneralReport(from, to) {
+  const [ranked, general] = await Promise.all([
+    db.getTeachersRankedByAbsence(from, to),
+    db.getGeneralStats(from, to)
+  ]);
 
-  generatePDFReport({
-    title: 'التقرير العام للحضور والغياب',
-    subtitle: `${fromLabel} - ${toLabel}`,
-    meta: [
-      { label: 'عدد المعلمات', value: ranked.length },
-      { label: 'إجمالي السجلات', value: stats.total }
-    ],
-    summary: [
-      { label: 'حاضرة', value: stats.present },
-      { label: 'متأخرة', value: stats.late },
-      { label: 'استئذان', value: stats.excused },
-      { label: 'إجازة مرضية', value: stats.sick_leave },
-      { label: 'غياب بدون عذر', value: stats.absent },
-      { label: 'نسبة الحضور العام', value: summary.presenceRate + '%' }
-    ],
-    columns: [
-      { key: 'name', label: 'المعلمة', width: '20%' },
-      { key: 'specialty', label: 'التخصص', width: '12%' },
-      { key: 'present', label: 'حاضرة', width: '9%' },
-      { key: 'late', label: 'متأخرة', width: '9%' },
-      { key: 'excused', label: 'استئذان', width: '9%' },
-      { key: 'sick_leave', label: 'مرضية', width: '9%' },
-      { key: 'absent', label: 'غياب', width: '9%' },
-      { key: 'totalAbsences', label: 'إجمالي الغياب', width: '12%' },
-      { key: 'totalRecords', label: 'إجمالي السجلات', width: '11%' }
-    ],
-    rows
+  const counts = { unrecorded: 0, ...Object.fromEntries(Object.keys(ATTENDANCE_STATUSES).map(k => [k, general.byStatus[k] || 0])) };
+  counts.total = general.total;
+  counts.recorded = general.total;
+
+  const rows = ranked.map((r, i) => {
+    const absenceTotal = r.absent + r.sick_leave;
+    return `<tr>
+      <td class="num">${i + 1}</td>
+      <td>${esc(r.name)}</td>
+      <td>${esc(r.specialty) || '<span class="muted">—</span>'}</td>
+      <td class="num">${r.present}</td>
+      <td class="num">${r.late}</td>
+      <td class="num">${r.excused}</td>
+      <td class="num">${r.sick_leave}</td>
+      <td class="num" style="color:${absenceTotal ? '#dc2626' : 'inherit'}">${r.absent}</td>
+      <td class="num">${r.official_leave}</td>
+      <td class="num">${r.official_mission}</td>
+      <td class="num"><strong>${absenceTotal}</strong></td>
+    </tr>`;
+  }).join('');
+
+  const body = `
+    ${statCards(counts)}
+    <p class="muted">
+      عدد المعلمات النشطات: <strong class="num">${general.activeTeachers}</strong> —
+      أيام التسجيل: <strong class="num">${general.daysRecorded}</strong> —
+      نسبة الحضور العامة: <strong class="num">${calculatePresenceRate(counts)}%</strong>
+    </p>
+
+    <h2>ترتيب المعلمات بالأكثر غياباً</h2>
+    ${rows ? `<table>
+      <thead><tr>
+        <th style="width:34px">م</th><th>المعلمة</th><th>التخصص</th>
+        <th>حاضرة</th><th>متأخرة</th><th>استئذان</th><th>مرضية</th>
+        <th>بدون عذر</th><th>رسمية</th><th>مهمة</th><th>مجموع الغياب</th>
+      </tr></thead>
+      <tbody>${rows}</tbody></table>`
+      : '<div class="empty">لا توجد بيانات في هذه الفترة.</div>'}`;
+
+  return reportShell({
+    title: 'التقرير العام للحضور',
+    subtitle: `الفترة من ${esc(from)} إلى ${esc(to)} هـ`,
+    body
   });
 }
 
-// ============================================================
-//  توليد تقرير سجل الحضور (مع فلترة)
-// ============================================================
-export async function generateHistoryReport(filters, title = 'سجل الحضور والغياب') {
-  const records = await getAttendanceHistory(filters);
+/* --- 4) تقرير السجل --- */
 
-  const rows = records.map(r => {
-    const hijri = keyToHijri(r.date_hijri);
-    return {
-      date: formatHijri(hijri),
-      name: r.teacher_name,
-      status: ATTENDANCE_STATUSES[r.status] || r.status,
-      time: r.time || '—',
-      note: r.note || '—'
-    };
-  });
+export async function generateHistoryReport(filters = {}) {
+  const records = await db.getAttendanceHistory(filters);
 
-  generatePDFReport({
-    title,
-    columns: [
-      { key: 'date', label: 'التاريخ', width: '20%' },
-      { key: 'name', label: 'المعلمة', width: '20%' },
-      { key: 'status', label: 'الحالة', width: '15%' },
-      { key: 'time', label: 'الوقت', width: '10%' },
-      { key: 'note', label: 'ملاحظة', width: '35%' }
-    ],
-    rows
-  });
-}
+  const rows = records.map((r, i) => `
+    <tr>
+      <td class="num">${i + 1}</td>
+      <td class="num">${esc(formatHijriShort(keyToHijri(r.date_hijri)))}</td>
+      <td>${esc(describeDay(r.date_hijri).weekday)}</td>
+      <td>${esc(r.teacher_name)}</td>
+      <td>${esc(r.specialty) || '<span class="muted">—</span>'}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td class="num">${esc(r.time) || '—'}</td>
+      <td>${esc(r.note) || ''}</td>
+    </tr>`).join('');
 
-// ============================================================
-//  توليد تقرير الإجازات
-// ============================================================
-export async function generateHolidaysReport(fromKey, toKey) {
-  const holidays = await getHolidays(fromKey, toKey);
+  const parts = [];
+  if (filters.from) parts.push(`من ${esc(filters.from)}`);
+  if (filters.to) parts.push(`إلى ${esc(filters.to)}`);
+  if (filters.teacherName) parts.push(`المعلمة: ${esc(filters.teacherName)}`);
+  if (filters.status) parts.push(`الحالة: ${esc(getStatusLabel(filters.status))}`);
 
-  const rows = holidays.map(h => {
-    const hijri = keyToHijri(h.date_hijri);
-    const greg = toGregorian(hijri.year, hijri.month, hijri.day);
-    return {
-      date: formatHijri(hijri),
-      weekday: getWeekdayAr(greg),
-      name: h.holiday_name || 'إجازة'
-    };
-  });
+  const body = `
+    <p class="muted">عدد السجلات: <strong class="num">${records.length}</strong></p>
+    ${rows ? `<table>
+      <thead><tr><th style="width:34px">م</th><th style="width:96px">التاريخ الهجري</th>
+        <th style="width:76px">اليوم</th><th>المعلمة</th><th>التخصص</th>
+        <th style="width:110px">الحالة</th><th style="width:64px">الوقت</th><th>ملاحظة</th></tr></thead>
+      <tbody>${rows}</tbody></table>`
+      : '<div class="empty">لا توجد سجلات مطابقة للفلاتر المحددة.</div>'}`;
 
-  generatePDFReport({
-    title: 'تقرير الإجازات الرسمية',
-    columns: [
-      { key: 'date', label: 'التاريخ الهجري', width: '40%' },
-      { key: 'weekday', label: 'اليوم', width: '20%' },
-      { key: 'name', label: 'اسم الإجازة', width: '40%' }
-    ],
-    rows
+  return reportShell({
+    title: 'تقرير سجل الحضور',
+    subtitle: parts.length ? parts.join(' — ') : 'كل السجلات',
+    body
   });
 }
 
-// ============================================================
-//  ============ دوال مساعدة داخلية ============
-// ============================================================
+/* --- 5) تقرير الإجازات --- */
 
-/**
- * حساب النسبة المئوية
- */
-function pct(value, total) {
-  if (total === 0) return '0%';
-  return Math.round((value / total) * 100) + '%';
+export async function generateHolidaysReport(from, to) {
+  const holidays = await db.getHolidays(from, to);
+
+  const rows = holidays.map((h, i) => {
+    const d = describeDay(h.date_hijri);
+    return `<tr>
+      <td class="num">${i + 1}</td>
+      <td class="num">${esc(d.hijriShort)}</td>
+      <td>${esc(d.weekday)}</td>
+      <td>${esc(d.gregorianLong)}</td>
+      <td>${esc(h.holiday_name) || '<span class="muted">بدون اسم</span>'}</td>
+    </tr>`;
+  }).join('');
+
+  const body = `
+    <p class="muted">عدد أيام الإجازة: <strong class="num">${holidays.length}</strong></p>
+    ${rows ? `<table>
+      <thead><tr><th style="width:36px">م</th><th style="width:110px">التاريخ الهجري</th>
+        <th style="width:90px">اليوم</th><th style="width:150px">الموافق</th><th>المناسبة</th></tr></thead>
+      <tbody>${rows}</tbody></table>`
+      : '<div class="empty">لا توجد إجازات مسجّلة في هذه الفترة.</div>'}`;
+
+  return reportShell({
+    title: 'تقرير الإجازات',
+    subtitle: `الفترة من ${esc(from)} إلى ${esc(to)} هـ`,
+    body,
+    orientation: 'portrait'
+  });
 }
 
-/**
- * تهريب HTML لمنع الحقن
- */
-function escapeHTML(str) {
-  if (str === null || str === undefined) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+/* --- تقرير الزيارات الصفية --- */
+
+export async function generateVisitsReport(filters = {}) {
+  const visits = await db.getAllVisits(filters);
+
+  const rows = visits.map((v, i) => `
+    <tr>
+      <td class="num">${i + 1}</td>
+      <td class="num">${esc(formatHijriShort(keyToHijri(v.date_hijri)))}</td>
+      <td>${esc(v.teacher_name)}</td>
+      <td>${esc(v.class_name) || '—'}</td>
+      <td>${esc(v.period_name) || '—'}</td>
+      <td>${esc(v.visit_type) || '—'}</td>
+      <td class="num">${v.score === null || v.score === undefined ? '—' : v.score}</td>
+      <td>${esc(v.strengths) || ''}</td>
+      <td>${esc(v.improvements) || ''}</td>
+      <td>${esc(v.recommendations) || ''}</td>
+    </tr>`).join('');
+
+  const body = `
+    <p class="muted">عدد الزيارات: <strong class="num">${visits.length}</strong></p>
+    ${rows ? `<table>
+      <thead><tr><th style="width:34px">م</th><th style="width:92px">التاريخ</th>
+        <th>المعلمة</th><th>الصف</th><th>الحصة</th><th>النوع</th><th style="width:54px">الدرجة</th>
+        <th>نقاط القوة</th><th>نقاط التحسين</th><th>التوصيات</th></tr></thead>
+      <tbody>${rows}</tbody></table>`
+      : '<div class="empty">لا توجد زيارات مطابقة للفلاتر المحددة.</div>'}`;
+
+  return reportShell({ title: 'تقرير الزيارات الصفية', subtitle: '', body });
 }
 
-// ============================================================
-//  إعادة تصدير دوال التقويم (لتسهيل الاستخدام من app.js)
-// ============================================================
-export {
-  formatHijri,
-  formatHijriShort,
-  formatGregorianShort,
-  hijriToKey,
-  keyToHijri,
-  getWeekdayAr,
-  getCurrentHijri,
-  toGregorian,
-  toHijri,
-  HIJRI_MONTHS_AR,
-  WEEKDAYS_AR
-};
+export { reportShell, esc as escapeHTML };

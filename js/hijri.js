@@ -1,275 +1,254 @@
-// ============================================================
-//  hijri.js — مكتبة التقويم الهجري
-//  - تحويل بين الهجري والميلادي
-//  - تنسيق بالعربية والإنجليزية
-//  - تعمل أوفلاين 100% (خوارزمية حسابية، لا API)
-//  - مبنية على تقويم أم القرى (Umm al-Qura)
-// ============================================================
+// hijri.js — تحويل التقويم الهجري/الميلادي حسابياً (Tabular Islamic Calendar)
+// بدون أي API خارجي. يدعم اختيارياً تقويم أم القرى عبر Intl المدمج في المتصفح.
 
-// ============================================================
-//  أسماء الأشهر الهجرية بالعربية
-// ============================================================
-const HIJRI_MONTHS_AR = [
+export const HIJRI_MONTHS_AR = [
   'محرم', 'صفر', 'ربيع الأول', 'ربيع الثاني',
   'جمادى الأولى', 'جمادى الآخرة', 'رجب', 'شعبان',
   'رمضان', 'شوال', 'ذو القعدة', 'ذو الحجة'
 ];
 
-const HIJRI_MONTHS_EN = [
-  'Muharram', 'Safar', 'Rabi al-Awwal', 'Rabi al-Thani',
-  'Jumada al-Ula', 'Jumada al-Akhirah', 'Rajab', 'Shaaban',
-  'Ramadan', 'Shawwal', 'Dhu al-Qadah', 'Dhu al-Hijjah'
+export const WEEKDAYS_AR = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+export const WORKING_DAYS = [0, 1, 2, 3, 4];
+
+const GREGORIAN_MONTHS_AR = [
+  'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+  'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
 ];
 
-// ============================================================
-//  أسماء الأيام بالعربية
-// ============================================================
-const WEEKDAYS_AR = [
-  'الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء',
-  'الخميس', 'الجمعة', 'السبت'
-];
+/* ------------------------------------------------------------------ */
+/* وضع التقويم: 'tabular' حسابي بحت | 'umalqura' أم القرى (Intl)       */
+/* ------------------------------------------------------------------ */
 
-// ============================================================
-//  ثوابت خوارزمية التقويم الهجري الحسابي
-// ============================================================
-const HIJRI_EPOCH = 1948439.5; // اليوم اليولياني لبداية التقويم الهجري
-const GREGORIAN_EPOCH = 1721425.5;
+let CALENDAR_MODE = 'tabular';
+let umalquraFormatter = null;
 
-// ============================================================
-//  التحقق من سنة كبيسة هجرية (دورة 30 سنة)
-//  السنوات الكبيسة: 2، 5، 7، 10، 13، 16، 18، 21، 24، 26، 29
-// ============================================================
-export function isHijriLeapYear(year) {
-  const leapYears = [2, 5, 7, 10, 13, 16, 18, 21, 24, 26, 29];
-  return leapYears.includes(year % 30);
-}
-
-// ============================================================
-//  عدد أيام شهر هجري
-// ============================================================
-export function getHijriMonthLength(year, month) {
-  if (month === 12 && isHijriLeapYear(year)) return 30;
-  if (month === 12) return 29;
-  return (month % 2 === 1) ? 30 : 29;
-}
-
-// ============================================================
-//  تحويل تاريخ ميلادي (JavaScript Date) إلى يوم يولياني
-// ============================================================
-function gregorianToJulian(date) {
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-
-  let y = year;
-  let m = month;
-
-  if (m <= 2) {
-    y -= 1;
-    m += 12;
+export function setCalendarMode(mode) {
+  if (mode === 'umalqura' && supportsUmalqura()) {
+    CALENDAR_MODE = 'umalqura';
+  } else {
+    CALENDAR_MODE = 'tabular';
   }
+  return CALENDAR_MODE;
+}
 
+export function getCalendarMode() {
+  return CALENDAR_MODE;
+}
+
+export function supportsUmalqura() {
+  try {
+    const f = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', {
+      day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'UTC'
+    });
+    const parts = f.formatToParts(new Date(Date.UTC(2026, 0, 1)));
+    return parts.some(p => p.type === 'year');
+  } catch (e) {
+    return false;
+  }
+}
+
+function getUmalquraFormatter() {
+  if (!umalquraFormatter) {
+    umalquraFormatter = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', {
+      day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'UTC'
+    });
+  }
+  return umalquraFormatter;
+}
+
+/* ------------------------------------------------------------------ */
+/* اليوم اليولياني (Julian Day Number)                                 */
+/* ------------------------------------------------------------------ */
+
+function gregorianToJD(year, month, day) {
+  let y = year, m = month;
+  if (m < 3) { y -= 1; m += 12; }
   const a = Math.floor(y / 100);
   const b = 2 - a + Math.floor(a / 4);
-
-  return Math.floor(365.25 * (y + 4716)) +
-         Math.floor(30.6001 * (m + 1)) +
-         day + b - 1524.5;
+  return Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + day + b - 1524;
 }
 
-// ============================================================
-//  تحويل يوم يولياني إلى تاريخ هجري
-// ============================================================
-function julianToHijri(jd) {
-  jd = Math.floor(jd) + 0.5;
-
-  const year = Math.floor((30 * (jd - HIJRI_EPOCH) + 10646) / 10631);
-  const month = Math.min(12, Math.ceil((jd - (29 + hijriToJulian(year, 1, 1))) / 29.5) + 1);
-  const day = Math.floor(jd - hijriToJulian(year, month, 1)) + 1;
-
-  return { year, month, day };
-}
-
-// ============================================================
-//  تحويل تاريخ هجري إلى يوم يولياني
-// ============================================================
-function hijriToJulian(year, month, day) {
-  return Math.floor((11 * year + 3) / 30) +
-         Math.floor(354 * year) +
-         Math.floor(30 * month) -
-         Math.floor((month - 1) / 2) +
-         day + HIJRI_EPOCH - 385;
-}
-
-// ============================================================
-//  تحويل يوم يولياني إلى تاريخ ميلادي
-// ============================================================
-function julianToGregorian(jd) {
-  jd = Math.floor(jd) + 0.5;
-
-  let z = Math.floor(jd + 0.5);
-  let a = z;
-
-  if (z >= 2299161) {
-    const alpha = Math.floor((z - 1867216.25) / 36524.25);
-    a = z + 1 + alpha - Math.floor(alpha / 4);
-  }
-
+function jdToGregorian(jd) {
+  const z = Math.floor(jd + 0.5);
+  let a = Math.floor((z - 1867216.25) / 36524.25);
+  a = z + 1 + a - Math.floor(a / 4);
   const b = a + 1524;
   const c = Math.floor((b - 122.1) / 365.25);
   const d = Math.floor(365.25 * c);
   const e = Math.floor((b - d) / 30.6001);
-
   const day = b - d - Math.floor(30.6001 * e);
   const month = e < 14 ? e - 1 : e - 13;
   const year = month > 2 ? c - 4716 : c - 4715;
-
-  return new Date(year, month - 1, day);
+  return { year, month, day };
 }
 
-// ============================================================
-//  الدالة الرئيسية: تحويل من ميلادي إلى هجري
-//  @param {Date|number} dateOrYear
-//  @param {number} month
-//  @param {number} day
-//  @returns {{year: number, month: number, day: number}}
-// ============================================================
-export function toHijri(dateOrYear, month, day) {
-  let date;
+function hijriToJDTabular(year, month, day) {
+  return Math.floor((11 * year + 3) / 30)
+    + 354 * year
+    + 30 * month
+    - Math.floor((month - 1) / 2)
+    + day + 1948440 - 385;
+}
 
-  if (dateOrYear instanceof Date) {
-    date = dateOrYear;
-  } else if (typeof dateOrYear === 'number' && month !== undefined && day !== undefined) {
-    // الشهر في JavaScript Date يبدأ من 0
-    date = new Date(dateOrYear, month - 1, day);
-  } else {
-    date = new Date();
+function jdToHijriTabular(jd) {
+  const j = Math.floor(jd);
+  const year = Math.floor((30 * (j - 1948440) + 10646) / 10631);
+  const month = Math.min(12, Math.ceil((j - (29 + hijriToJDTabular(year, 1, 1))) / 29.5) + 1);
+  const day = j - hijriToJDTabular(year, month, 1) + 1;
+  return { year, month, day };
+}
+
+/* ------------------------------------------------------------------ */
+/* أم القرى عبر Intl                                                   */
+/* ------------------------------------------------------------------ */
+
+function jdToHijriUmalqura(jd) {
+  const g = jdToGregorian(jd);
+  const dt = new Date(Date.UTC(g.year, g.month - 1, g.day));
+  const parts = getUmalquraFormatter().formatToParts(dt);
+  const get = (t) => parseInt(parts.find(p => p.type === t).value, 10);
+  return { year: get('year'), month: get('month'), day: get('day') };
+}
+
+function hijriToJDUmalqura(year, month, day) {
+  // نبدأ من التقدير الحسابي ثم نصحّح بالبحث الخطي (الفرق لا يتجاوز أياماً قليلة)
+  let jd = hijriToJDTabular(year, month, day);
+  for (let i = 0; i < 12; i++) {
+    const h = jdToHijriUmalqura(jd);
+    const diff = (h.year - year) * 354.367 + (h.month - month) * 29.53 + (h.day - day);
+    if (h.year === year && h.month === month && h.day === day) return jd;
+    jd -= diff > 0 ? Math.max(1, Math.round(diff)) : Math.min(-1, Math.round(diff));
   }
-
-  const jd = gregorianToJulian(date);
-  return julianToHijri(jd);
+  return jd;
 }
 
-// ============================================================
-//  تحويل من هجري إلى ميلادي
-//  @returns {Date}
-// ============================================================
+/* ------------------------------------------------------------------ */
+/* الواجهة العامة                                                      */
+/* ------------------------------------------------------------------ */
+
+function toJD(hijri) {
+  return CALENDAR_MODE === 'umalqura'
+    ? hijriToJDUmalqura(hijri.year, hijri.month, hijri.day)
+    : hijriToJDTabular(hijri.year, hijri.month, hijri.day);
+}
+
+function fromJD(jd) {
+  return CALENDAR_MODE === 'umalqura' ? jdToHijriUmalqura(jd) : jdToHijriTabular(jd);
+}
+
+/** تحويل تاريخ ميلادي (Date) إلى {year, month, day} هجري */
+export function toHijri(date) {
+  const d = date instanceof Date ? date : new Date(date);
+  const jd = gregorianToJD(d.getFullYear(), d.getMonth() + 1, d.getDate());
+  return fromJD(jd);
+}
+
+/** تحويل تاريخ هجري إلى Date ميلادي (منتصف اليوم محلياً لتفادي مشاكل المناطق الزمنية) */
 export function toGregorian(year, month, day) {
-  const jd = hijriToJulian(year, month, day);
-  return julianToGregorian(jd);
+  const jd = toJD({ year, month, day });
+  const g = jdToGregorian(jd);
+  return new Date(g.year, g.month - 1, g.day, 12, 0, 0, 0);
 }
 
-// ============================================================
-//  جلب التاريخ الهجري الحالي
-// ============================================================
+/** تاريخ اليوم هجرياً */
 export function getCurrentHijri() {
   return toHijri(new Date());
 }
 
-// ============================================================
-//  تنسيق تاريخ هجري كنص
-//  @param {{year, month, day}} hijriDate
-//  @param {{locale?: 'ar'|'en', includeWeekday?: boolean, weekday?: number}} options
-// ============================================================
-export function formatHijri(hijriDate, options = {}) {
-  const { locale = 'ar', includeWeekday = false, weekday } = options;
-  const months = locale === 'ar' ? HIJRI_MONTHS_AR : HIJRI_MONTHS_EN;
-  const monthName = months[hijriDate.month - 1];
-
-  let result = `${hijriDate.day} ${monthName} ${hijriDate.year}`;
-
-  if (includeWeekday && weekday !== undefined) {
-    const weekdayName = WEEKDAYS_AR[weekday];
-    result = `${weekdayName}، ${result}`;
-  }
-
-  return result;
+/**
+ * تنسيق التاريخ الهجري.
+ * opts: { withWeekday: Date|null, withYear: true, numeric: false }
+ */
+export function formatHijri(hijriDate, opts = {}) {
+  const { withWeekday = null, withYear = true, numeric = false } = opts;
+  const monthName = HIJRI_MONTHS_AR[hijriDate.month - 1] || '';
+  let out = numeric
+    ? `${pad(hijriDate.day)}/${pad(hijriDate.month)}`
+    : `${hijriDate.day} ${monthName}`;
+  if (withYear) out += numeric ? `/${hijriDate.year}` : ` ${hijriDate.year}هـ`;
+  if (withWeekday instanceof Date) out = `${getWeekdayAr(withWeekday)}، ${out}`;
+  return out;
 }
 
-// ============================================================
-//  تنسيق مختصر (DD/MM/YYYY هجري)
-// ============================================================
+/** تنسيق مختصر: 15/09/1447 */
 export function formatHijriShort(hijriDate) {
-  const m = String(hijriDate.month).padStart(2, '0');
-  const d = String(hijriDate.day).padStart(2, '0');
-  return `${hijriDate.year}/${m}/${d}`;
+  return `${pad(hijriDate.day)}/${pad(hijriDate.month)}/${hijriDate.year}`;
 }
 
-// ============================================================
-//  تنسيق مختصر ميلادي (DD/MM/YYYY)
-// ============================================================
+/** تنسيق ميلادي مختصر: 15 مارس 2026 */
 export function formatGregorianShort(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  const d = date instanceof Date ? date : new Date(date);
+  return `${d.getDate()} ${GREGORIAN_MONTHS_AR[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-// ============================================================
-//  مقارنة تاريخين هجريين
-//  @returns {number} -1 إذا a < b، 0 إذا متساويان، 1 إذا a > b
-// ============================================================
-export function compareHijri(a, b) {
-  if (a.year !== b.year) return a.year - b.year;
-  if (a.month !== b.month) return a.month - b.month;
-  return a.day - b.day;
+/** تنسيق ميلادي للتخزين: 2026-03-15 */
+export function toISODate(date) {
+  const d = date instanceof Date ? date : new Date(date);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-// ============================================================
-//  تحويل تاريخ هجري إلى مفتاح نصي موحد (للتخزين في DB)
-//  الصيغة: YYYY-MM-DD (مثلاً: 1447-10-14)
-// ============================================================
+/** مفتاح التخزين الهجري: "1447-09-15" */
 export function hijriToKey(hijriDate) {
-  const y = String(hijriDate.year).padStart(4, '0');
-  const m = String(hijriDate.month).padStart(2, '0');
-  const d = String(hijriDate.day).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return `${hijriDate.year}-${pad(hijriDate.month)}-${pad(hijriDate.day)}`;
 }
 
-// ============================================================
-//  تحويل مفتاح نصي إلى كائن تاريخ هجري
-//  @param {string} key — الصيغة YYYY-MM-DD
-// ============================================================
+/** عكس hijriToKey */
 export function keyToHijri(key) {
-  const [year, month, day] = key.split('-').map(Number);
+  const [year, month, day] = String(key).split('-').map(n => parseInt(n, 10));
   return { year, month, day };
 }
 
-// ============================================================
-//  جلب اسم اليوم بالعربية من تاريخ ميلادي
-// ============================================================
+/** اسم اليوم بالعربية من تاريخ ميلادي */
 export function getWeekdayAr(date) {
-  return WEEKDAYS_AR[date.getDay()];
+  const d = date instanceof Date ? date : new Date(date);
+  return WEEKDAYS_AR[d.getDay()];
 }
 
-// ============================================================
-//  هل التاريخ يوم عمل؟ (الأحد إلى الخميس)
-//  @param {Date} date — تاريخ ميلادي
-// ============================================================
+/** هل اليوم من أيام الدراسة (الأحد → الخميس)؟ */
 export function isWorkingDay(date) {
-  const day = date.getDay(); // 0=الأحد، 1=الإثنين، ...، 5=الجمعة، 6=السبت
-  return day >= 0 && day <= 4; // الأحد إلى الخميس
+  const d = date instanceof Date ? date : new Date(date);
+  return WORKING_DAYS.includes(d.getDay());
 }
 
-// ============================================================
-//  إضافة أيام إلى تاريخ هجري
-//  @returns {{year, month, day}}
-// ============================================================
+/** إضافة أيام (موجبة أو سالبة) لتاريخ هجري */
 export function addDaysToHijri(hijriDate, days) {
-  const jd = hijriToJulian(hijriDate.year, hijriDate.month, hijriDate.day);
-  return julianToHijri(jd + days);
+  return fromJD(toJD(hijriDate) + days);
 }
 
-// ============================================================
-//  الفرق بالأيام بين تاريخين هجريين
-// ============================================================
+/** الفرق بالأيام بين تاريخين هجريين (a - b) */
 export function hijriDiffDays(a, b) {
-  const jdA = hijriToJulian(a.year, a.month, a.day);
-  const jdB = hijriToJulian(b.year, b.month, b.day);
-  return Math.floor(jdA - jdB);
+  return toJD(a) - toJD(b);
 }
 
-// ============================================================
-//  تصدير أسماء الأشهر والأيام (للاستخدام في الواجهة)
-// ============================================================
-export { HIJRI_MONTHS_AR, HIJRI_MONTHS_EN, WEEKDAYS_AR };
+/** مقارنة تاريخين هجريين: -1 / 0 / 1 */
+export function compareHijri(a, b) {
+  const d = hijriDiffDays(a, b);
+  return d === 0 ? 0 : (d > 0 ? 1 : -1);
+}
+
+/** هل السنة الهجرية كبيسة (355 يوماً)؟ */
+export function isHijriLeapYear(year) {
+  return ((11 * year + 14) % 30) < 11;
+}
+
+/** عدد أيام شهر هجري */
+export function getHijriMonthLength(year, month) {
+  const start = toJD({ year, month, day: 1 });
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const nextYear = month === 12 ? year + 1 : year;
+  const end = toJD({ year: nextYear, month: nextMonth, day: 1 });
+  return end - start;
+}
+
+/** أول وآخر يوم في شهر هجري كمفاتيح */
+export function getHijriMonthRange(year, month) {
+  const len = getHijriMonthLength(year, month);
+  return {
+    from: hijriToKey({ year, month, day: 1 }),
+    to: hijriToKey({ year, month, day: len })
+  };
+}
+
+function pad(n) {
+  return String(n).padStart(2, '0');
+}

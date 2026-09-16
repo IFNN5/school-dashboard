@@ -1,70 +1,77 @@
-// ============================================================
-//  search.js — محرك البحث (مطابقة تامة)
-//  - Exact Match فقط (لا Fuzzy، لا Prefix)
-//  - البحث اللحظي مع كل حرف
-// ============================================================
+// search.js — بحث لحظي في أسماء المعلمات باستخدام MiniSearch
+// مطابقة تامة: بدون fuzzy وبدون prefix. "نور" لا تجد "نورة".
 
-import MiniSearch from 'https://cdn.jsdelivr.net/npm/minisearch@7.2.0/dist/es/index.js';
+import MiniSearch from 'https://cdn.jsdelivr.net/npm/minisearch@7.1.0/dist/es/index.js';
 
-let miniSearch = null;
+let engine = null;
 
-export function initSearch(teachers = []) {
-  miniSearch = new MiniSearch({
-    fields: ['name', 'specialty', 'phone', 'email'],
-    storeFields: ['id', 'name', 'specialty', 'phone', 'email', 'hire_date', 'notes'],
-    searchOptions: {
-      // ✅ مطابقة تامة: لا fuzzy، لا prefix
-      fuzzy: false,
-      prefix: false,
-      combineWith: 'AND' // كل الكلمات يجب أن تتطابق
-    },
-    tokenize: (text) => text.split(/[\s,.\-()]+/).filter(Boolean),
-    processTerm: (term) => term.toLowerCase().trim()
-  });
-
-  if (teachers.length > 0) {
-    miniSearch.addAll(teachers);
-  }
-
-  console.log(`🔍 Search index ready (${teachers.length} records)`);
-  return miniSearch;
+/** توحيد الحروف العربية: إزالة التشكيل والتطويل، وتوحيد الألف والياء */
+function normalizeArabic(text) {
+  return String(text || '')
+    .replace(/[\u064B-\u065F\u0670]/g, '')  // التشكيل
+    .replace(/\u0640/g, '')                 // التطويل
+    .replace(/[\u0622\u0623\u0625\u0671]/g, '\u0627') // آ أ إ → ا
+    .replace(/\u0649/g, '\u064A')           // ى → ي
+    .trim();
 }
 
-export function searchTeachers(query) {
-  if (!miniSearch) return [];
-  if (!query || query.trim() === '') return [];
+function processTerm(term) {
+  const t = normalizeArabic(term).toLowerCase();
+  return t.length ? t : null;
+}
 
-  // ✅ المطابقة التامة: نستخدم بحث MiniSearch العادي
-  // لكن بدون fuzzy أو prefix
-  const results = miniSearch.search(query.trim());
-  return results.map(r => ({
-    id: r.id,
-    name: r.name,
-    specialty: r.specialty,
-    phone: r.phone,
-    email: r.email,
-    hire_date: r.hire_date,
-    notes: r.notes
-  }));
+const OPTIONS = {
+  fields: ['name', 'specialty', 'phone', 'email'],
+  storeFields: ['id', 'name', 'specialty'],
+  idField: 'id',
+  processTerm,
+  searchOptions: {
+    fuzzy: false,
+    prefix: false,
+    combineWith: 'AND',
+    processTerm
+  }
+};
+
+function toDoc(teacher) {
+  return {
+    id: teacher.id,
+    name: teacher.name || '',
+    specialty: teacher.specialty || '',
+    phone: teacher.phone || '',
+    email: teacher.email || ''
+  };
+}
+
+/** بناء الفهرس من الصفر */
+export function initSearch(teachers = []) {
+  engine = new MiniSearch(OPTIONS);
+  engine.addAll(teachers.map(toDoc));
+  return engine;
+}
+
+/** البحث — يُعيد مصفوفة معرّفات مرتبة حسب الصلة */
+export function searchTeachers(query) {
+  const clean = normalizeArabic(query);
+  if (!engine || !clean) return [];
+  return engine.search(clean).map(r => r.id);
 }
 
 export function addToIndex(teacher) {
-  if (!miniSearch) return;
-  try { miniSearch.add(teacher); } catch (err) { /* موجودة مسبقاً */ }
+  if (!engine || !teacher) return;
+  try { engine.remove({ id: teacher.id }); } catch (e) { /* غير مفهرس بعد */ }
+  engine.add(toDoc(teacher));
 }
 
 export function removeFromIndex(id) {
-  if (!miniSearch) return;
-  try { miniSearch.discard(id); } catch (err) { /* غير موجودة */ }
+  if (!engine) return;
+  try { engine.discard(id); } catch (e) { /* غير موجود */ }
 }
 
 export function reindexAll(teachers = []) {
-  if (!miniSearch) return initSearch(teachers);
-  miniSearch.removeAll();
-  if (teachers.length > 0) miniSearch.addAll(teachers);
-  console.log(`🔍 Reindexed: ${teachers.length} records`);
+  return initSearch(teachers);
 }
 
 export function indexSize() {
-  return miniSearch ? miniSearch.documentCount : 0;
+  return engine ? engine.documentCount : 0;
 }

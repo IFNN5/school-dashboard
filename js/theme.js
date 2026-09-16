@@ -1,201 +1,160 @@
-// ============================================================
-//  theme.js — إدارة الألوان والتخصيص
-//  - يخزّن الإعدادات في localStorage (تبقى بعد إغلاق المتصفح)
-//  - يطبق الألوان عبر CSS Variables (فوري بدون إعادة تحميل)
-// ============================================================
+// theme.js — تخصيص المظهر عبر متغيرات CSS، محفوظ في localStorage
 
-// ============================================================
-//  المفتاح المستخدم في localStorage
-// ============================================================
 const STORAGE_KEY = 'school-dashboard-theme';
 
-// ============================================================
-//  الإعدادات الافتراضية
-// ============================================================
-const DEFAULT_THEME = {
-  primary: '#2563eb',       // اللون الأساسي (أزرار، روابط)
-  bg: '#f8fafc',            // خلفية الصفحة
-  text: '#1e293b',          // لون النص العام
-  sidebar: '#1e293b',       // خلفية الشريط الجانبي
-  sidebarText: '#ffffff',   // نص الشريط الجانبي
-  radius: 10,               // نصف قطر الحواف (بكسل)
-  font: 'Segoe UI',         // نوع الخط
-  schoolName: 'لوحة وكيلة المعلمات', // اسم المدرسة/التطبيق
-  schoolLogo: ''            // شعار المدرسة (base64 أو رابط)
-};
-
-// ============================================================
-//  قائمة الخطوط المتاحة
-//  (نستخدم خطوط النظام لتفادي تحميل خطوط خارجية ثقيلة)
-// ============================================================
 export const AVAILABLE_FONTS = [
-  { value: 'Segoe UI',       label: 'Segoe UI (افتراضي)' },
-  { value: 'Tahoma',          label: 'Tahoma' },
-  { value: 'Arial',           label: 'Arial' },
-  { value: 'system-ui',       label: 'خط النظام' },
-  { value: 'Cairo',           label: 'Cairo' },
-  { value: 'Tajawal',         label: 'Tajawal' }
+  { value: "'Segoe UI', Tahoma, system-ui, sans-serif", label: 'Segoe UI' },
+  { value: "Tahoma, 'Segoe UI', sans-serif", label: 'Tahoma' },
+  { value: "Arial, Helvetica, sans-serif", label: 'Arial' },
+  { value: "system-ui, -apple-system, sans-serif", label: 'خط النظام' },
+  { value: "'Cairo', 'Segoe UI', sans-serif", label: 'Cairo' },
+  { value: "'Tajawal', 'Segoe UI', sans-serif", label: 'Tajawal' }
 ];
 
-// ============================================================
-//  تحميل الإعدادات من localStorage
-//  - إذا لم تُوجد، تُرجع الافتراضية
-//  - تدمج الإعدادات المحفوظة مع الافتراضية (لملء الناقص)
-// ============================================================
+export const DEFAULT_THEME_VALUES = {
+  primary: '#2563eb',
+  bg: '#f8fafc',
+  text: '#1e293b',
+  sidebar: '#1e293b',
+  sidebarText: '#ffffff',
+  radius: 10,
+  font: "'Segoe UI', Tahoma, system-ui, sans-serif"
+};
+
+let current = { ...DEFAULT_THEME_VALUES };
+
+/** تحويل لون hex إلى rgb */
+function hexToRgb(hex) {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(String(hex).trim());
+  if (!m) return null;
+  return { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) };
+}
+
+function rgbToHex(r, g, b) {
+  const c = v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+  return `#${c(r)}${c(g)}${c(b)}`;
+}
+
+/** تفتيح أو تغميق لون بنسبة (-1 إلى 1) */
+function shade(hex, amount) {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return hex;
+  const t = amount < 0 ? 0 : 255;
+  const p = Math.abs(amount);
+  return rgbToHex(
+    (t - rgb.r) * p + rgb.r,
+    (t - rgb.g) * p + rgb.g,
+    (t - rgb.b) * p + rgb.b
+  );
+}
+
+/** لون نص مناسب (أبيض/داكن) حسب سطوع الخلفية */
+export function contrastText(hex) {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return '#ffffff';
+  const l = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+  return l > 0.6 ? '#1e293b' : '#ffffff';
+}
+
+export function getTheme() {
+  return { ...current };
+}
+
+/** قراءة الثيم من localStorage */
 export function loadTheme() {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return { ...DEFAULT_THEME };
-
-    const parsed = JSON.parse(saved);
-
-    // دمج مع الافتراضية لضمان وجود كل المفاتيح
-    return { ...DEFAULT_THEME, ...parsed };
-  } catch (err) {
-    console.warn('Failed to load theme:', err);
-    return { ...DEFAULT_THEME };
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      current = { ...DEFAULT_THEME_VALUES, ...saved };
+    }
+  } catch (e) {
+    console.warn('[theme] تعذّرت قراءة الثيم المحفوظ، سيُستخدم الافتراضي');
+    current = { ...DEFAULT_THEME_VALUES };
   }
+  return { ...current };
 }
 
-// ============================================================
-//  تطبيق الإعدادات على CSS Variables
-//  التغيير يظهر فوريًا في كل مكان
-// ============================================================
+/** تطبيق الثيم فوراً على :root */
 export function applyTheme(theme) {
-  if (!theme) return;
-
+  if (theme) current = { ...current, ...theme };
   const root = document.documentElement;
+  const t = current;
 
-  // الألوان الأساسية
-  if (theme.primary)      root.style.setProperty('--primary', theme.primary);
-  if (theme.bg)           root.style.setProperty('--bg', theme.bg);
-  if (theme.text)         root.style.setProperty('--text', theme.text);
-  if (theme.sidebar)      root.style.setProperty('--sidebar', theme.sidebar);
-  if (theme.sidebarText)  root.style.setProperty('--sidebar-text', theme.sidebarText);
+  root.style.setProperty('--primary', t.primary);
+  root.style.setProperty('--primary-hover', shade(t.primary, -0.18));
+  root.style.setProperty('--primary-soft', shade(t.primary, 0.88));
+  root.style.setProperty('--primary-text', contrastText(t.primary));
+  root.style.setProperty('--bg', t.bg);
+  root.style.setProperty('--text', t.text);
+  root.style.setProperty('--text-muted', shade(t.text, 0.42));
+  root.style.setProperty('--border', shade(t.text, 0.86));
+  root.style.setProperty('--sidebar', t.sidebar);
+  root.style.setProperty('--sidebar-text', t.sidebarText);
+  root.style.setProperty('--sidebar-hover', shade(t.sidebar, 0.12));
+  root.style.setProperty('--radius', `${t.radius}px`);
+  root.style.setProperty('--radius-sm', `${Math.max(2, Math.round(t.radius * 0.6))}px`);
+  root.style.setProperty('--font', t.font);
 
-  // الألوان المشتقة
-  if (theme.primary) {
-    root.style.setProperty('--primary-hover', darkenColor(theme.primary, 12));
-  }
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', t.primary);
 
-  // نصف قطر الحواف
-  if (theme.radius !== undefined) {
-    root.style.setProperty('--radius', `${theme.radius}px`);
-  }
-
-  // نوع الخط
-  if (theme.font) {
-    root.style.setProperty('--font',
-      `'${theme.font}', 'Segoe UI', Tahoma, system-ui, sans-serif`);
-  }
-
-  // تحديث عنوان الصفحة
-  if (theme.schoolName) {
-    document.title = theme.schoolName;
-  }
+  return { ...current };
 }
 
-// ============================================================
-//  حفظ الإعدادات في localStorage
-// ============================================================
+/** حفظ الثيم الحالي */
 export function saveTheme(theme) {
+  if (theme) current = { ...current, ...theme };
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(theme));
-    return true;
-  } catch (err) {
-    console.error('Failed to save theme:', err);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+  } catch (e) {
+    console.warn('[theme] تعذّر حفظ الثيم');
     return false;
   }
+  applyTheme();
+  return true;
 }
 
-// ============================================================
-//  إعادة الإعدادات إلى الوضع الافتراضي
-//  @returns {Object} الإعدادات الافتراضية بعد التطبيق
-// ============================================================
+/** العودة للإعدادات الافتراضية */
 export function resetTheme() {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch (err) {
-    console.warn('Failed to clear theme:', err);
-  }
-  const fresh = { ...DEFAULT_THEME };
-  applyTheme(fresh);
-  return fresh;
+  current = { ...DEFAULT_THEME_VALUES };
+  try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* تجاهل */ }
+  applyTheme();
+  return { ...current };
 }
 
-// ============================================================
-//  تصدير الإعدادات كملف JSON (نسخة احتياطية)
-// ============================================================
-export function exportTheme(theme) {
-  const json = JSON.stringify(theme, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
+/** تصدير ملف الثيم */
+export function exportTheme() {
+  const blob = new Blob([JSON.stringify(current, null, 2)], { type: 'application/json;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `theme-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = 'مظهر-اللوحة.json';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-// ============================================================
-//  استيراد الإعدادات من ملف JSON
-//  @returns {Promise<Object>} الإعدادات بعد الاستيراد
-// ============================================================
+/** استيراد ملف ثيم — يُعيد Promise بالثيم المطبَّق */
 export function importTheme(file) {
   return new Promise((resolve, reject) => {
-    if (!file) {
-      reject(new Error('لم يتم اختيار ملف'));
-      return;
-    }
-
+    if (!file) { reject(new Error('لم يُختر أي ملف')); return; }
     const reader = new FileReader();
-
-    reader.onload = (e) => {
+    reader.onload = () => {
       try {
-        const parsed = JSON.parse(e.target.result);
-        const merged = { ...DEFAULT_THEME, ...parsed };
-        applyTheme(merged);
-        saveTheme(merged);
-        resolve(merged);
-      } catch (err) {
-        reject(new Error('ملف الثيم غير صالح: ' + err.message));
+        const parsed = JSON.parse(String(reader.result || ''));
+        const clean = {};
+        for (const key of Object.keys(DEFAULT_THEME_VALUES)) {
+          if (parsed[key] !== undefined) clean[key] = parsed[key];
+        }
+        saveTheme(clean);
+        resolve({ ...current });
+      } catch (e) {
+        reject(new Error('ملف المظهر غير صالح'));
       }
     };
-
-    reader.onerror = () => reject(new Error('فشل قراءة الملف'));
-    reader.readAsText(file, 'UTF-8');
+    reader.onerror = () => reject(new Error('تعذّرت قراءة الملف'));
+    reader.readAsText(file, 'utf-8');
   });
 }
-
-// ============================================================
-//  دالة مساعدة: تغميق لون HEX بنسبة معينة
-//  تُستخدم لاشتقاق لون primary-hover من primary
-// ============================================================
-function darkenColor(hex, percent = 10) {
-  // إزالة #
-  hex = hex.replace('#', '');
-
-  // تحويل إلى RGB
-  const r = parseInt(hex.substring(0, 2), 16);
-  const g = parseInt(hex.substring(2, 4), 16);
-  const b = parseInt(hex.substring(4, 6), 16);
-
-  // تغميق
-  const factor = 1 - percent / 100;
-  const nr = Math.max(0, Math.round(r * factor));
-  const ng = Math.max(0, Math.round(g * factor));
-  const nb = Math.max(0, Math.round(b * factor));
-
-  // إرجاع HEX
-  return '#' +
-    nr.toString(16).padStart(2, '0') +
-    ng.toString(16).padStart(2, '0') +
-    nb.toString(16).padStart(2, '0');
-}
-
-// ============================================================
-//  تصدير الإعدادات الافتراضية (لمن يحتاجها)
-// ============================================================
-export const DEFAULT_THEME_VALUES = { ...DEFAULT_THEME };

@@ -1,599 +1,1329 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>لوحة وكيلة المعلمات</title>
-  <link rel="manifest" href="manifest.json">
-  <link rel="icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="css/style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2563eb">
+<meta name="description" content="لوحة إدارة عمل وكيلة المعلمات — تعمل بالكامل بدون إنترنت">
+<title>لوحة وكيلة المعلمات</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<link rel="stylesheet" href="./css/style.css">
 </head>
-<body x-data="app()" x-init="init()" x-cloak>
+<body>
 
-  <!-- ============================================================
-       الشريط الجانبي
-  ============================================================ -->
-  <aside class="sidebar">
-    <h2>لوحة الوكيلة</h2>
-    <nav>
-      <button @click="tab='teachers'"   :class="{active: tab==='teachers'}">المعلمات</button>
-      <button @click="tab='attendance'" :class="{active: tab==='attendance'}">الحضور</button>
-      <button @click="tab='history'"    :class="{active: tab==='history'}">السجل</button>
-      <button @click="tab='reports'"    :class="{active: tab==='reports'}">التقارير</button>
-      <button @click="tab='schedule'"   :class="{active: tab==='schedule'}">الجدول</button>
-      <button @click="tab='visits'"     :class="{active: tab==='visits'}">الزيارات</button>
-      <button @click="tab='settings'"   :class="{active: tab==='settings'}">الإعدادات</button>
-    </nav>
-  </aside>
+<!-- أيقونات SVG مشتركة -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="i-teachers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+  </symbol>
+  <symbol id="i-attendance" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+  </symbol>
+  <symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/>
+  </symbol>
+  <symbol id="i-reports" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/>
+  </symbol>
+  <symbol id="i-schedule" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>
+  </symbol>
+  <symbol id="i-visits" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+  </symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+  </symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/>
+  </symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <path d="M12 5v14M5 12h14"/>
+  </symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/>
+  </symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+  </symbol>
+  <symbol id="i-print" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+  </symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M15 18l-6-6 6-6"/>
+  </symbol>
+  <symbol id="i-next" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 18l6-6-6-6"/>
+  </symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>
+  </symbol>
+  <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <path d="M18 6L6 18M6 6l12 12"/>
+  </symbol>
+  <symbol id="i-empty" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/>
+  </symbol>
+  <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+  </symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+  </symbol>
+</svg>
 
-  <!-- ============================================================
-       المحتوى الرئيسي
-  ============================================================ -->
-  <main class="content">
+<!-- شاشة التحميل — خارج Alpine حتى تظهر فوراً قبل تحميل المكتبات -->
+<div class="boot" id="boot">
+  <div class="boot-inner">
+    <div class="spinner"></div>
+    <div id="boot-message">جارٍ تجهيز اللوحة…</div>
+    <p class="muted" style="font-size:12.5px;max-width:300px">أول تشغيل يحتاج اتصالاً بالإنترنت لتحميل المكتبات، وبعدها تعمل اللوحة بالكامل بدون إنترنت.</p>
+  </div>
+</div>
 
-    <!-- ============================================================
-         تبويب: المعلمات
-    ============================================================ -->
-    <template x-if="tab==='teachers'">
-      <div>
-        <h1>المعلمات</h1>
+<div x-data="app()" x-cloak>
 
-        <div class="search-bar">
-          <input type="text"
-                 x-model="query"
-                 @input="liveSearch()"
-                 placeholder="ابحث بالاسم أو التخصص أو الهاتف...">
-        </div>
+  <div class="layout" x-show="booted">
 
-        <div class="toolbar">
-          <button @click="showAddForm = !showAddForm">إضافة معلمة</button>
-          <button @click="importFile()">استيراد CSV / JSON</button>
-          <button @click="downloadTemplate()">تحميل قالب CSV</button>
-          <button @click="exportData('json')">تصدير JSON</button>
-          <button @click="exportData('csv')">تصدير CSV</button>
-          <button class="btn-secondary" @click="toggleShowInactive()">
-            <span x-text="showInactiveTeachers ? 'إخفاء المعطّلات' : 'عرض المعطّلات'"></span>
+    <!-- ================= الشريط الجانبي ================= -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <h1>لوحة وكيلة المعلمات</h1>
+        <p x-text="day ? day.hijriLong : ''"></p>
+      </div>
+
+      <nav class="sidebar-nav">
+        <template x-for="t in tabs" :key="t.key">
+          <button class="nav-item" :class="{ active: tab === t.key }" @click="switchTab(t.key)">
+            <svg><use :href="'#i-' + t.key"></use></svg>
+            <span x-text="t.label"></span>
+            <span class="nav-count" x-show="t.key === 'teachers'" x-text="activeTeachers.length"></span>
           </button>
-        </div>
-
-        <!-- نموذج الإضافة -->
-        <template x-if="showAddForm">
-          <div class="form-panel">
-            <h3>إضافة معلمة جديدة</h3>
-            <div class="form-grid">
-              <label>الاسم الكامل
-                <input type="text" x-model="newTeacher.name" required>
-              </label>
-              <label>التخصص
-                <input type="text" x-model="newTeacher.specialty">
-              </label>
-              <label>رقم الهاتف
-                <input type="text" x-model="newTeacher.phone">
-              </label>
-              <label>البريد الإلكتروني
-                <input type="email" x-model="newTeacher.email">
-              </label>
-              <label>تاريخ التعيين
-                <input type="date" x-model="newTeacher.hire_date">
-              </label>
-              <label>ملاحظات
-                <input type="text" x-model="newTeacher.notes">
-              </label>
-            </div>
-            <div class="form-actions">
-              <button class="btn-success" @click="saveNewTeacher(newTeacher)">حفظ</button>
-              <button class="btn-secondary" @click="showAddForm=false">إلغاء</button>
-            </div>
-          </div>
         </template>
+      </nav>
 
-        <!-- نموذج التعديل -->
-        <template x-if="showEditForm && editingTeacher">
-          <div class="form-panel">
-            <h3>تعديل بيانات المعلمة</h3>
-            <div class="form-grid">
-              <label>الاسم الكامل
-                <input type="text" x-model="editingTeacher.name" required>
-              </label>
-              <label>التخصص
-                <input type="text" x-model="editingTeacher.specialty">
-              </label>
-              <label>رقم الهاتف
-                <input type="text" x-model="editingTeacher.phone">
-              </label>
-              <label>البريد الإلكتروني
-                <input type="email" x-model="editingTeacher.email">
-              </label>
-              <label>تاريخ التعيين
-                <input type="date" x-model="editingTeacher.hire_date">
-              </label>
-              <label>ملاحظات
-                <input type="text" x-model="editingTeacher.notes">
-              </label>
-              <label>الحالة
-                <select x-model="editingTeacher.is_active">
-                  <option :value="true">نشطة</option>
-                  <option :value="false">معطّلة</option>
-                </select>
-              </label>
-            </div>
-            <div class="form-actions">
-              <button class="btn-success" @click="saveEditTeacher()">حفظ التعديل</button>
-              <button class="btn-secondary" @click="cancelEdit()">إلغاء</button>
-            </div>
-          </div>
-        </template>
-
-        <!-- جدول المعلمات -->
-        <template x-if="filteredTeachers.length > 0">
-          <table>
-            <thead>
-              <tr>
-                <th>الاسم</th>
-                <th>التخصص</th>
-                <th>الهاتف</th>
-                <th>البريد</th>
-                <th>الحالة</th>
-                <th>إجراءات</th>
-              </tr>
-            </thead>
-            <tbody>
-              <template x-for="t in filteredTeachers" :key="t.id">
-                <tr :class="{inactive: !t.is_active}">
-                  <td x-text="t.name"></td>
-                  <td x-text="t.specialty || '—'"></td>
-                  <td x-text="t.phone || '—'"></td>
-                  <td x-text="t.email || '—'"></td>
-                  <td>
-                    <span class="badge" :class="t.is_active ? 'badge-success' : 'badge-muted'"
-                          x-text="t.is_active ? 'نشطة' : 'معطّلة'"></span>
-                  </td>
-                  <td>
-                    <button title="تعديل" @click="openEditForm(t)">تعديل</button>
-                    <button title="تفعيل/تعطيل" @click="toggleTeacherActive(t.id)">
-                      <span x-text="t.is_active ? 'تعطيل' : 'تفعيل'"></span>
-                    </button>
-                    <button title="حذف" @click="deleteTeacher(t.id)">حذف</button>
-                  </td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
-        </template>
-
-        <template x-if="filteredTeachers.length === 0">
-          <div class="empty">
-            <p x-text="query ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد معلمات — ابدئي بإضافة معلمة'"></p>
-          </div>
-        </template>
+      <div class="sidebar-foot">
+        <span>تعمل بدون إنترنت</span>
+        <span x-text="'التقويم: ' + (calendarMode === 'umalqura' ? 'أم القرى' : 'حسابي')"></span>
       </div>
-    </template>
+    </aside>
 
-    <!-- ============================================================
-         تبويب: الحضور (تسجيل جماعي)
-    ============================================================ -->
-    <template x-if="tab==='attendance'">
-      <div>
-        <h1>تسجيل الحضور اليومي</h1>
+    <main class="content">
 
-        <!-- شريط التاريخ -->
-        <div class="date-bar">
-          <button class="btn-secondary" @click="navigateDay(-1)">اليوم السابق</button>
-          <div class="date-display">
-            <div class="date-hijri" x-text="attendanceDateLabel"></div>
-            <div class="date-gregorian" x-text="attendanceDateGregorian + ' م'"></div>
+      <!-- ============================================================ -->
+      <!-- 1. المعلمات                                                  -->
+      <!-- ============================================================ -->
+      <section x-show="tab === 'teachers'">
+        <div class="page-head">
+          <div>
+            <h2>المعلمات</h2>
+            <p x-text="`${activeTeachers.length} معلمة نشطة من أصل ${teachers.length}`"></p>
           </div>
-          <button class="btn-secondary" @click="goToToday()">اليوم</button>
-          <button class="btn-secondary" @click="navigateDay(1)">اليوم التالي</button>
-        </div>
-
-        <!-- تنبيه الإجازة -->
-        <template x-if="isHoliday">
-          <div class="alert alert-info">
-            <span>هذا اليوم مُعيَّن كإجازة: <strong x-text="holidayName"></strong></span>
-            <button class="btn-secondary" @click="toggleHoliday()">إلغاء الإجازة</button>
-          </div>
-        </template>
-
-        <!-- أزرار التحكم -->
-        <div class="toolbar">
-          <button @click="setAllPresent()">تعيين الباقي كحاضرة</button>
-          <button @click="saveDay()">حفظ التسجيل</button>
-          <button class="btn-secondary" @click="clearDayUI()">مسح الواجهة</button>
-          <button class="btn-secondary" @click="deleteDayFromDB()">حذف سجلات اليوم</button>
-          <button class="btn-secondary" @click="toggleHoliday()">
-            <span x-text="isHoliday ? 'إلغاء الإجازة' : 'تعيين كإجازة'"></span>
-          </button>
-          <button class="btn-secondary" @click="exportDailyReport()">تقرير اليوم PDF</button>
-        </div>
-
-        <!-- بطاقات الإحصائيات -->
-        <div class="stats-cards">
-          <div class="stat-card">
-            <div class="stat-value" x-text="dashboardStats.todayPresent"></div>
-            <div class="stat-label">حاضرة</div>
-          </div>
-          <div class="stat-card stat-warning">
-            <div class="stat-value" x-text="dashboardStats.todayLate"></div>
-            <div class="stat-label">متأخرة</div>
-          </div>
-          <div class="stat-card stat-info">
-            <div class="stat-value" x-text="dashboardStats.todayExcused"></div>
-            <div class="stat-label">استئذان</div>
-          </div>
-          <div class="stat-card stat-danger">
-            <div class="stat-value" x-text="dashboardStats.todayAbsent"></div>
-            <div class="stat-label">غياب</div>
-          </div>
-          <div class="stat-card stat-muted">
-            <div class="stat-value" x-text="dashboardStats.todayNotRecorded"></div>
-            <div class="stat-label">لم يُسجَّل</div>
+          <div class="toolbar">
+            <button class="btn btn-primary" @click="openAddTeacher()">
+              <svg><use href="#i-plus"></use></svg> إضافة معلمة
+            </button>
+            <button class="btn" @click="triggerImport()">
+              <svg><use href="#i-upload"></use></svg> استيراد
+            </button>
+            <button class="btn" @click="downloadTemplate()">قالب CSV</button>
+            <button class="btn" @click="exportTeachersCSV()">
+              <svg><use href="#i-download"></use></svg> CSV
+            </button>
+            <button class="btn" @click="exportTeachersJSON()">JSON</button>
+            <input type="file" x-ref="importFile" accept=".csv,.json,text/csv,application/json"
+                   class="hidden" @change="onImportFile($event)">
           </div>
         </div>
 
-        <!-- جدول التسجيل الجماعي -->
-        <template x-if="roster.length > 0">
-          <div class="attendance-table-wrapper">
-            <table class="attendance-table">
-              <thead>
-                <tr>
-                  <th style="width:22%">المعلمة</th>
-                  <th style="width:10%">التخصص</th>
-                  <th style="width:38%">الحالة</th>
-                  <th style="width:12%">الوقت</th>
-                  <th style="width:18%">ملاحظة</th>
-                </tr>
-              </thead>
-              <tbody>
-                <template x-for="item in roster" :key="item.teacher.id">
-                  <tr :class="{'row-recorded': item.status}">
-                    <td class="teacher-name" x-text="item.teacher.name"></td>
-                    <td class="teacher-specialty" x-text="item.teacher.specialty || '—'"></td>
-                    <td>
-                      <div class="status-buttons">
-                        <template x-for="st in statusList" :key="st.key">
-                          <button class="status-btn"
-                                  :class="{'status-active': item.status === st.key}"
-                                  :style="item.status === st.key ? 'background:' + st.color + '; color:#fff; border-color:' + st.color : ''"
-                                  @click="setStatus(item.teacher.id, st.key)"
-                                  x-text="st.label"></button>
-                        </template>
-                      </div>
-                    </td>
-                    <td>
-                      <template x-if="item.status === 'late' || item.status === 'excused'">
-                        <input type="time"
-                               class="time-input"
-                               :value="item.time"
-                               @input="setTime(item.teacher.id, $event.target.value)">
-                      </template>
-                      <template x-if="item.status !== 'late' && item.status !== 'excused'">
-                        <span class="muted">—</span>
-                      </template>
-                    </td>
-                    <td>
-                      <input type="text"
-                             class="note-input"
-                             placeholder="ملاحظة..."
-                             :value="item.note"
-                             @input="setNote(item.teacher.id, $event.target.value)">
-                    </td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-        </template>
-
-        <template x-if="roster.length === 0">
-          <div class="empty">
-            <p>لا توجد معلمات نشطات — أضيفي معلمات أولاً</p>
-          </div>
-        </template>
-      </div>
-    </template>
-
-    <!-- ============================================================
-         تبويب: السجل
-    ============================================================ -->
-    <template x-if="tab==='history'">
-      <div>
-        <h1>سجل الحضور والغياب</h1>
-
-        <!-- الفلاتر -->
-        <div class="filters-panel">
-          <div class="filter-grid">
-            <label>من تاريخ
-              <input type="date" x-model="historyFilters.from">
-            </label>
-            <label>إلى تاريخ
-              <input type="date" x-model="historyFilters.to">
-            </label>
-            <label>المعلمة
-              <select x-model="historyFilters.teacher_id">
-                <option value="">الكل</option>
-                <template x-for="t in teachers" :key="t.id">
-                  <option :value="t.id" x-text="t.name"></option>
-                </template>
-              </select>
-            </label>
-            <label>الحالة
-              <select x-model="historyFilters.status">
-                <option value="">الكل</option>
-                <template x-for="st in statusList" :key="st.key">
-                  <option :value="st.key" x-text="st.label"></option>
-                </template>
-              </select>
-            </label>
-          </div>
-          <div class="form-actions">
-            <button @click="loadHistory()">بحث</button>
-            <button class="btn-secondary" @click="clearHistoryFilters()">مسح الفلاتر</button>
-            <button class="btn-secondary" @click="exportHistoryReport()">تصدير PDF</button>
-          </div>
-        </div>
-
-        <!-- الجدول -->
-        <template x-if="historyLoading">
-          <div class="empty"><p>جاري التحميل...</p></div>
-        </template>
-
-        <template x-if="!historyLoading && historyRecords.length > 0">
-          <table>
-            <thead>
-              <tr>
-                <th>التاريخ الهجري</th>
-                <th>المعلمة</th>
-                <th>التخصص</th>
-                <th>الحالة</th>
-                <th>الوقت</th>
-                <th>ملاحظة</th>
-              </tr>
-            </thead>
-            <tbody>
-              <template x-for="r in historyRecords" :key="r.id">
-                <tr>
-                  <td x-text="formatRecordDate(r.date_hijri)"></td>
-                  <td x-text="r.teacher_name"></td>
-                  <td x-text="r.teacher_specialty || '—'"></td>
-                  <td>
-                    <span class="badge" :style="'background:' + getStatusColor(r.status)"
-                          x-text="getStatusLabel(r.status)"></span>
-                  </td>
-                  <td x-text="r.time || '—'"></td>
-                  <td x-text="r.note || '—'"></td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
-        </template>
-
-        <template x-if="!historyLoading && historyRecords.length === 0">
-          <div class="empty">
-            <p>لا توجد سجلات — حدّدي الفلاتر واضغطي "بحث"</p>
-          </div>
-        </template>
-      </div>
-    </template>
-
-    <!-- ============================================================
-         تبويب: التقارير
-    ============================================================ -->
-    <template x-if="tab==='reports'">
-      <div>
-        <h1>التقارير</h1>
-
-        <!-- تبويبات داخلية -->
-        <div class="report-tabs">
-          <button :class="{active: reportTab==='daily'}"    @click="reportTab='daily'">تقرير يومي</button>
-          <button :class="{active: reportTab==='teacher'}"  @click="reportTab='teacher'">تقرير معلمة</button>
-          <button :class="{active: reportTab==='general'}"  @click="reportTab='general'">التقرير العام</button>
-          <button :class="{active: reportTab==='history'}"  @click="reportTab='history'">تقرير السجل</button>
-          <button :class="{active: reportTab==='holidays'}" @click="reportTab='holidays'">تقرير الإجازات</button>
-        </div>
-
-        <!-- تقرير يومي -->
-        <template x-if="reportTab==='daily'">
-          <div class="settings-panel">
-            <h3>تقرير الحضور اليومي</h3>
-            <p class="muted">يولّد تقريراً بكل المعلمات مع حالاتهنّ في اليوم المحدد.</p>
-            <p>اليوم المحدد: <strong x-text="attendanceDateLabel"></strong></p>
+        <div class="card">
+          <div class="card-head">
+            <div class="search-wrap">
+              <svg><use href="#i-search"></use></svg>
+              <input type="search" placeholder="ابحثي بالاسم أو التخصص — مطابقة تامة"
+                     x-model="query" @input="liveSearch()">
+            </div>
             <div class="toolbar">
-              <button @click="exportDailyReport()">توليد PDF</button>
+              <button class="btn btn-sm btn-ghost" x-show="query" @click="clearSearch()">مسح البحث</button>
+              <label class="btn btn-sm">
+                <input type="checkbox" x-model="showInactive" style="width:auto;margin-inline-end:6px">
+                إظهار المعطّلات
+              </label>
             </div>
           </div>
-        </template>
 
-        <!-- تقرير معلمة -->
-        <template x-if="reportTab==='teacher'">
-          <div class="settings-panel">
-            <h3>تقرير أداء معلمة</h3>
-            <div class="filter-grid">
-              <label>المعلمة
-                <select x-model="reportTeacher.id">
-                  <option value="">اختاري معلمة</option>
+          <div class="card-body tight">
+            <div class="table-wrap" x-show="visibleTeachers.length">
+              <table class="data">
+                <thead>
+                  <tr>
+                    <th style="width:44px">م</th>
+                    <th>الاسم</th>
+                    <th>التخصص</th>
+                    <th>الهاتف</th>
+                    <th>البريد</th>
+                    <th style="width:80px">الحالة</th>
+                    <th style="width:150px">إجراءات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="(t, i) in visibleTeachers" :key="t.id">
+                    <tr>
+                      <td class="num muted" x-text="i + 1"></td>
+                      <td x-text="t.name"></td>
+                      <td x-text="t.specialty || '—'" :class="t.specialty ? '' : 'muted'"></td>
+                      <td class="num" x-text="t.phone || '—'" :class="t.phone ? '' : 'muted'"></td>
+                      <td x-text="t.email || '—'" :class="t.email ? '' : 'muted'"></td>
+                      <td>
+                        <span class="badge" :class="t.is_active ? '' : 'badge-muted'"
+                              :style="t.is_active ? 'background:var(--success)' : ''"
+                              x-text="t.is_active ? 'نشطة' : 'معطّلة'"></span>
+                      </td>
+                      <td class="actions">
+                        <button class="btn btn-sm btn-icon" title="تعديل" @click="openEditTeacher(t)">
+                          <svg><use href="#i-edit"></use></svg>
+                        </button>
+                        <button class="btn btn-sm" @click="toggleActive(t)"
+                                x-text="t.is_active ? 'تعطيل' : 'تفعيل'"></button>
+                        <button class="btn btn-sm btn-danger btn-icon" title="حذف" @click="removeTeacher(t)">
+                          <svg><use href="#i-trash"></use></svg>
+                        </button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="empty" x-show="!visibleTeachers.length">
+              <svg><use href="#i-empty"></use></svg>
+              <h4 x-text="query ? 'لا نتائج مطابقة' : 'لا توجد معلمات بعد'"></h4>
+              <p x-text="query ? 'البحث مطابقة تامة — جرّبي الاسم الكامل.' : 'أضيفي معلمة يدوياً أو استوردي ملف CSV.'"></p>
+              <button class="btn btn-primary" x-show="!query" @click="openAddTeacher()">إضافة أول معلمة</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- 2. الحضور                                                    -->
+      <!-- ============================================================ -->
+      <section x-show="tab === 'attendance'">
+        <div class="page-head">
+          <div>
+            <h2>تسجيل الحضور</h2>
+            <p>سجّلي حالة كل معلمة ثم احفظي الكشف.</p>
+          </div>
+          <div class="toolbar">
+            <button class="btn" @click="markRestPresent()">تعيين الباقي كحاضرة</button>
+            <button class="btn btn-primary" @click="saveAttendance()" :disabled="savingAttendance">
+              <svg><use href="#i-attendance"></use></svg>
+              <span x-text="savingAttendance ? 'جارٍ الحفظ…' : 'حفظ التسجيل'"></span>
+            </button>
+            <button class="btn" @click="clearRosterUI()">مسح الواجهة</button>
+            <button class="btn btn-danger" @click="deleteDayRecords()">حذف سجلات اليوم</button>
+            <button class="btn" @click="toggleHoliday()"
+                    x-text="dayStatus && dayStatus.is_holiday ? 'إلغاء الإجازة' : 'تعيين إجازة'"></button>
+            <button class="btn" @click="printDaily()">
+              <svg><use href="#i-print"></use></svg> تقرير اليوم
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="datebar">
+            <button class="btn btn-icon" title="اليوم السابق" @click="goDay(-1)">
+              <svg><use href="#i-next"></use></svg>
+            </button>
+            <div class="display">
+              <div class="h-date" x-text="day ? day.hijriLong : ''"></div>
+              <div class="g-date" x-text="day ? 'الموافق ' + day.gregorianLong : ''"></div>
+            </div>
+            <button class="btn btn-icon" title="اليوم التالي" @click="goDay(1)">
+              <svg><use href="#i-prev"></use></svg>
+            </button>
+            <button class="btn btn-sm" @click="goToday()">اليوم</button>
+          </div>
+        </div>
+
+        <div class="alert alert-warning" x-show="dayStatus && dayStatus.is_holiday">
+          <svg><use href="#i-alert"></use></svg>
+          <span class="grow" x-text="'هذا اليوم إجازة: ' + (dayStatus && dayStatus.holiday_name || '')"></span>
+          <button class="btn btn-sm" @click="toggleHoliday()">إلغاء الإجازة</button>
+        </div>
+
+        <div class="alert alert-info" x-show="day && !day.isWorkingDay">
+          <svg><use href="#i-alert"></use></svg>
+          <span class="grow" x-text="day ? day.weekday + ' ليس من أيام الدراسة (الأحد إلى الخميس).' : ''"></span>
+        </div>
+
+        <div class="stats">
+          <div class="stat" :style="`--accent:${statusColor('present')}`">
+            <div class="value" x-text="dayStats.present"></div><div class="label">حاضرة</div>
+          </div>
+          <div class="stat" :style="`--accent:${statusColor('late')}`">
+            <div class="value" x-text="dayStats.late"></div><div class="label">متأخرة</div>
+          </div>
+          <div class="stat" :style="`--accent:${statusColor('excused')}`">
+            <div class="value" x-text="dayStats.excused"></div><div class="label">استئذان</div>
+          </div>
+          <div class="stat" :style="`--accent:${statusColor('absent')}`">
+            <div class="value" x-text="dayStats.absenceTotal"></div><div class="label">غياب (مرضي + بدون عذر)</div>
+          </div>
+          <div class="stat" style="--accent:#94a3b8">
+            <div class="value" x-text="dayStats.unrecorded"></div><div class="label">لم تُسجَّل</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3>كشف التسجيل</h3>
+            <span class="muted" x-text="`نسبة الحضور ${presenceRate}% من ${dayStats.recorded} سجلاً`"></span>
+          </div>
+          <div class="card-body tight">
+            <div class="table-wrap" x-show="roster.length">
+              <table class="data">
+                <thead>
+                  <tr>
+                    <th style="width:190px">المعلمة</th>
+                    <th>الحالة</th>
+                    <th style="width:120px">الوقت</th>
+                    <th style="width:220px">ملاحظة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="row in roster" :key="row.teacher_id">
+                    <tr class="roster-row" :class="{ unset: !row.status }">
+                      <td>
+                        <div x-text="row.name"></div>
+                        <div class="muted" style="font-size:12px" x-text="row.specialty"></div>
+                      </td>
+                      <td>
+                        <div class="status-group">
+                          <template x-for="s in statusList" :key="s.key">
+                            <button type="button" class="status-btn"
+                                    :class="{ on: row.status === s.key }"
+                                    :style="row.status === s.key ? `background:${s.color}` : `color:${s.color}`"
+                                    @click="setStatus(row, s.key)"
+                                    x-text="s.label"></button>
+                          </template>
+                        </div>
+                      </td>
+                      <td>
+                        <input type="time" class="time-input" x-model="row.time"
+                               x-show="needsTime(row.status)">
+                        <span class="muted" x-show="!needsTime(row.status)">—</span>
+                      </td>
+                      <td>
+                        <input type="text" class="note-input" x-model="row.note" placeholder="اختياري">
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="empty" x-show="!roster.length">
+              <svg><use href="#i-empty"></use></svg>
+              <h4>لا توجد معلمات نشطات</h4>
+              <p>أضيفي معلمات من تبويب المعلمات ليظهر كشف التسجيل هنا.</p>
+              <button class="btn btn-primary" @click="switchTab('teachers')">الذهاب إلى المعلمات</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- 3. السجل                                                     -->
+      <!-- ============================================================ -->
+      <section x-show="tab === 'history'">
+        <div class="page-head">
+          <div>
+            <h2>سجل الحضور</h2>
+            <p>آخر 1000 سجل مرتّبة من الأحدث.</p>
+          </div>
+          <div class="toolbar">
+            <button class="btn btn-primary" @click="loadHistory()">بحث</button>
+            <button class="btn" @click="clearHistoryFilters()">مسح الفلاتر</button>
+            <button class="btn" @click="printHistory()">
+              <svg><use href="#i-print"></use></svg> تصدير PDF
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <div class="filters">
+              <div class="field">
+                <label for="h-from">من تاريخ (هجري)</label>
+                <input id="h-from" type="text" class="num" x-model="historyFilters.from" placeholder="1447-09-01">
+              </div>
+              <div class="field">
+                <label for="h-to">إلى تاريخ (هجري)</label>
+                <input id="h-to" type="text" class="num" x-model="historyFilters.to" placeholder="1447-09-30">
+              </div>
+              <div class="field">
+                <label for="h-teacher">المعلمة</label>
+                <select id="h-teacher" x-model="historyFilters.teacherId">
+                  <option value="">كل المعلمات</option>
                   <template x-for="t in teachers" :key="t.id">
                     <option :value="t.id" x-text="t.name"></option>
                   </template>
                 </select>
-              </label>
-              <label>من تاريخ
-                <input type="date" x-model="reportRange.from">
-              </label>
-              <label>إلى تاريخ
-                <input type="date" x-model="reportRange.to">
-              </label>
-            </div>
-            <div class="toolbar">
-              <button @click="exportTeacherReport()">توليد PDF</button>
-              <button class="btn-secondary" @click="setCurrentMonthRange()">الشهر الحالي</button>
-            </div>
-          </div>
-        </template>
-
-        <!-- التقرير العام -->
-        <template x-if="reportTab==='general'">
-          <div class="settings-panel">
-            <h3>التقرير العام</h3>
-            <p class="muted">ترتيب المعلمات حسب الأكثر غياباً وتأخراً في الفترة المحددة.</p>
-            <div class="filter-grid">
-              <label>من تاريخ
-                <input type="date" x-model="reportRange.from">
-              </label>
-              <label>إلى تاريخ
-                <input type="date" x-model="reportRange.to">
-              </label>
-            </div>
-            <div class="toolbar">
-              <button @click="exportGeneralReport()">توليد PDF</button>
-              <button class="btn-secondary" @click="setCurrentMonthRange()">الشهر الحالي</button>
+              </div>
+              <div class="field">
+                <label for="h-status">الحالة</label>
+                <select id="h-status" x-model="historyFilters.status">
+                  <option value="">كل الحالات</option>
+                  <template x-for="s in statusList" :key="s.key">
+                    <option :value="s.key" x-text="s.label"></option>
+                  </template>
+                </select>
+              </div>
             </div>
           </div>
-        </template>
-
-        <!-- تقرير السجل -->
-        <template x-if="reportTab==='history'">
-          <div class="settings-panel">
-            <h3>تقرير السجل</h3>
-            <p class="muted">يولّد PDF بناءً على الفلاتر المحددة في تبويب "السجل".</p>
-            <div class="toolbar">
-              <button @click="exportHistoryReport()">توليد PDF</button>
-              <button class="btn-secondary" @click="tab='history'">الانتقال للسجل</button>
-            </div>
-          </div>
-        </template>
-
-        <!-- تقرير الإجازات -->
-        <template x-if="reportTab==='holidays'">
-          <div class="settings-panel">
-            <h3>تقرير الإجازات</h3>
-            <p class="muted">قائمة بكل الإجازات المُعيَّنة خلال الفترة.</p>
-            <div class="filter-grid">
-              <label>من تاريخ
-                <input type="date" x-model="reportRange.from">
-              </label>
-              <label>إلى تاريخ
-                <input type="date" x-model="reportRange.to">
-              </label>
-            </div>
-            <div class="toolbar">
-              <button @click="exportHolidaysReport()">توليد PDF</button>
-            </div>
-          </div>
-        </template>
-      </div>
-    </template>
-
-    <!-- ============================================================
-         تبويب: الجدول (مؤقت)
-    ============================================================ -->
-    <template x-if="tab==='schedule'">
-      <div>
-        <h1>الجدول الدراسي</h1>
-        <div class="empty"><p>سيتم إضافة وحدة الجدول الدراسي هنا</p></div>
-      </div>
-    </template>
-
-    <!-- ============================================================
-         تبويب: الزيارات (مؤقت)
-    ============================================================ -->
-    <template x-if="tab==='visits'">
-      <div>
-        <h1>الزيارات الصفية</h1>
-        <div class="empty"><p>سيتم إضافة وحدة الزيارات الصفية هنا</p></div>
-      </div>
-    </template>
-
-    <!-- ============================================================
-         تبويب: الإعدادات
-    ============================================================ -->
-    <template x-if="tab==='settings'">
-      <div>
-        <h1>الإعدادات</h1>
-
-        <div class="settings-panel">
-          <h3>تخصيص الألوان</h3>
-          <label>
-            <span>اللون الأساسي</span>
-            <input type="color" x-model="theme.primary" @input="applyTheme()">
-          </label>
-          <label>
-            <span>لون الخلفية</span>
-            <input type="color" x-model="theme.bg" @input="applyTheme()">
-          </label>
-          <label>
-            <span>لون النص</span>
-            <input type="color" x-model="theme.text" @input="applyTheme()">
-          </label>
-          <label>
-            <span>لون الشريط الجانبي</span>
-            <input type="color" x-model="theme.sidebar" @input="applyTheme()">
-          </label>
-          <label>
-            <span>لون نص الشريط الجانبي</span>
-            <input type="color" x-model="theme.sidebarText" @input="applyTheme()">
-          </label>
         </div>
 
-        <div class="settings-panel" style="margin-top:20px;">
-          <h3>الخط والحواف</h3>
-          <label>
-            <span>نوع الخط</span>
-            <select x-model="theme.font" @change="applyTheme()">
-              <template x-for="f in availableFonts" :key="f.value">
-                <option :value="f.value" x-text="f.label"></option>
-              </template>
+        <div class="card">
+          <div class="card-head">
+            <h3>النتائج</h3>
+            <span class="muted num" x-text="`${historyRecords.length} سجلاً`"></span>
+          </div>
+          <div class="card-body tight">
+            <div class="table-wrap" x-show="historyRecords.length">
+              <table class="data">
+                <thead>
+                  <tr>
+                    <th style="width:44px">م</th>
+                    <th style="width:110px">التاريخ الهجري</th>
+                    <th>المعلمة</th>
+                    <th>التخصص</th>
+                    <th style="width:120px">الحالة</th>
+                    <th style="width:80px">الوقت</th>
+                    <th>ملاحظة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="(r, i) in historyRecords" :key="r.id">
+                    <tr>
+                      <td class="num muted" x-text="i + 1"></td>
+                      <td class="num" x-text="formatDateKey(r.date_hijri)"></td>
+                      <td x-text="r.teacher_name"></td>
+                      <td class="muted" x-text="r.specialty || '—'"></td>
+                      <td>
+                        <span class="badge" :style="`background:${statusColor(r.status)}`"
+                              x-text="statusLabel(r.status)"></span>
+                      </td>
+                      <td class="num" x-text="r.time || '—'"></td>
+                      <td class="muted" x-text="r.note || ''"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="empty" x-show="!historyRecords.length">
+              <svg><use href="#i-empty"></use></svg>
+              <h4 x-text="historyLoading ? 'جارٍ البحث…' : 'لا سجلات مطابقة'"></h4>
+              <p>وسّعي نطاق التاريخ أو امسحي الفلاتر ثم اضغطي بحث.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- 4. التقارير                                                  -->
+      <!-- ============================================================ -->
+      <section x-show="tab === 'reports'">
+        <div class="page-head">
+          <div>
+            <h2>التقارير</h2>
+            <p>يفتح التقرير في نافذة جديدة وتبدأ الطباعة تلقائياً — اختاري "حفظ بصيغة PDF".</p>
+          </div>
+        </div>
+
+        <div class="subtabs">
+          <button class="subtab" :class="{active: reportTab === 'daily'}" @click="reportTab = 'daily'">تقرير يومي</button>
+          <button class="subtab" :class="{active: reportTab === 'teacher'}" @click="reportTab = 'teacher'">تقرير معلمة</button>
+          <button class="subtab" :class="{active: reportTab === 'general'}" @click="reportTab = 'general'">التقرير العام</button>
+          <button class="subtab" :class="{active: reportTab === 'history'}" @click="reportTab = 'history'">تقرير السجل</button>
+          <button class="subtab" :class="{active: reportTab === 'holidays'}" @click="reportTab = 'holidays'">تقرير الإجازات</button>
+        </div>
+
+        <!-- يومي -->
+        <div class="card" x-show="reportTab === 'daily'">
+          <div class="card-head"><h3>تقرير الحضور اليومي</h3></div>
+          <div class="card-body">
+            <p class="muted">يشمل كشف اليوم كاملاً مع ملخص الحالات ونسبة الحضور وحقلي توقيع.</p>
+            <div class="filters">
+              <div class="field">
+                <label for="r-day">اليوم (هجري)</label>
+                <input id="r-day" type="text" class="num" x-model="dateKey" @change="loadDay()">
+              </div>
+              <div class="field">
+                <label>&nbsp;</label>
+                <div x-text="day ? day.hijriLong : ''"></div>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" @click="printDaily()">
+                <svg><use href="#i-print"></use></svg> إصدار التقرير
+              </button>
+              <button class="btn" @click="goToday()">العودة لليوم</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- معلمة -->
+        <div class="card" x-show="reportTab === 'teacher'">
+          <div class="card-head"><h3>تقرير معلمة</h3></div>
+          <div class="card-body">
+            <p class="muted">بيانات المعلمة وإحصاءات حضورها وتفصيل سجلاتها خلال الفترة.</p>
+            <div class="filters">
+              <div class="field">
+                <label for="r-teacher">المعلمة</label>
+                <select id="r-teacher" x-model="reportTeacherId">
+                  <option value="">اختاري المعلمة</option>
+                  <template x-for="t in teachers" :key="t.id">
+                    <option :value="t.id" x-text="t.name"></option>
+                  </template>
+                </select>
+              </div>
+              <div class="field">
+                <label for="rt-from">من</label>
+                <input id="rt-from" type="text" class="num" x-model="reportRange.from">
+              </div>
+              <div class="field">
+                <label for="rt-to">إلى</label>
+                <input id="rt-to" type="text" class="num" x-model="reportRange.to">
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" @click="printTeacherReport()">
+                <svg><use href="#i-print"></use></svg> إصدار التقرير
+              </button>
+              <button class="btn" @click="resetReportRange()" x-text="'الشهر الحالي: ' + monthLabel"></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- عام -->
+        <div class="card" x-show="reportTab === 'general'">
+          <div class="card-head"><h3>التقرير العام</h3></div>
+          <div class="card-body">
+            <p class="muted">ملخص المدرسة كاملة مع ترتيب المعلمات بالأكثر غياباً.</p>
+            <div class="filters">
+              <div class="field">
+                <label for="rg-from">من</label>
+                <input id="rg-from" type="text" class="num" x-model="reportRange.from">
+              </div>
+              <div class="field">
+                <label for="rg-to">إلى</label>
+                <input id="rg-to" type="text" class="num" x-model="reportRange.to">
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" @click="printGeneral()">
+                <svg><use href="#i-print"></use></svg> إصدار التقرير
+              </button>
+              <button class="btn" @click="resetReportRange()" x-text="'الشهر الحالي: ' + monthLabel"></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- السجل -->
+        <div class="card" x-show="reportTab === 'history'">
+          <div class="card-head"><h3>تقرير السجل</h3></div>
+          <div class="card-body">
+            <p class="muted">يستخدم الفلاتر المحددة في تبويب السجل.</p>
+            <div class="info-list">
+              <div><span>من تاريخ</span><strong class="num" x-text="historyFilters.from || 'بدون حد'"></strong></div>
+              <div><span>إلى تاريخ</span><strong class="num" x-text="historyFilters.to || 'بدون حد'"></strong></div>
+              <div><span>المعلمة</span><strong x-text="historyFilters.teacherId ? teacherName(historyFilters.teacherId) : 'كل المعلمات'"></strong></div>
+              <div><span>الحالة</span><strong x-text="historyFilters.status ? statusLabel(historyFilters.status) : 'كل الحالات'"></strong></div>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" @click="printHistory()">
+                <svg><use href="#i-print"></use></svg> إصدار التقرير
+              </button>
+              <button class="btn" @click="switchTab('history')">تعديل الفلاتر</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- الإجازات -->
+        <div class="card" x-show="reportTab === 'holidays'">
+          <div class="card-head"><h3>تقرير الإجازات</h3></div>
+          <div class="card-body">
+            <p class="muted">كل الأيام المسجّلة كإجازة خلال الفترة.</p>
+            <div class="filters">
+              <div class="field">
+                <label for="rh-from">من</label>
+                <input id="rh-from" type="text" class="num" x-model="reportRange.from">
+              </div>
+              <div class="field">
+                <label for="rh-to">إلى</label>
+                <input id="rh-to" type="text" class="num" x-model="reportRange.to">
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" @click="printHolidays()">
+                <svg><use href="#i-print"></use></svg> إصدار التقرير
+              </button>
+              <button class="btn" @click="resetReportRange()" x-text="'الشهر الحالي: ' + monthLabel"></button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- 5. الجدول                                                    -->
+      <!-- ============================================================ -->
+      <section x-show="tab === 'schedule'">
+        <div class="page-head">
+          <div>
+            <h2>الجدول الدراسي</h2>
+            <p>الصفوف والمواد والحصص، ثم التكليفات، ثم بناء الجدول.</p>
+          </div>
+        </div>
+
+        <div class="subtabs">
+          <button class="subtab" :class="{active: scheduleTab === 'setup'}" @click="scheduleTab = 'setup'">الصفوف والمواد والحصص</button>
+          <button class="subtab" :class="{active: scheduleTab === 'assign'}" @click="scheduleTab = 'assign'">التكليفات</button>
+          <button class="subtab" :class="{active: scheduleTab === 'build'}" @click="scheduleTab = 'build'; refreshBuilder()">بناء الجدول</button>
+          <button class="subtab" :class="{active: scheduleTab === 'view'}" @click="scheduleTab = 'view'; refreshView()">عرض الجدول</button>
+        </div>
+
+        <!-- 5.1 الإعداد -->
+        <div x-show="scheduleTab === 'setup'">
+
+          <!-- الصفوف -->
+          <div class="card">
+            <div class="card-head"><h3>الصفوف</h3><span class="muted num" x-text="classes.length + ' صف'"></span></div>
+            <div class="card-body">
+              <div class="form-grid">
+                <div class="field"><label for="c-name">اسم الصف</label>
+                  <input id="c-name" type="text" x-model="classForm.name" placeholder="أول ابتدائي أ"></div>
+                <div class="field"><label for="c-grade">المرحلة</label>
+                  <input id="c-grade" type="number" min="1" max="12" x-model="classForm.grade_level"></div>
+                <div class="field"><label for="c-section">الشعبة</label>
+                  <input id="c-section" type="text" x-model="classForm.section" placeholder="أ"></div>
+                <div class="field"><label for="c-cap">السعة</label>
+                  <input id="c-cap" type="number" min="1" x-model="classForm.capacity"></div>
+                <div class="field full"><label for="c-notes">ملاحظات</label>
+                  <input id="c-notes" type="text" x-model="classForm.notes"></div>
+              </div>
+              <div class="form-actions">
+                <button class="btn btn-primary" @click="saveClass()" x-text="classForm.id ? 'حفظ التعديلات' : 'إضافة الصف'"></button>
+                <button class="btn" x-show="classForm.id" @click="resetClassForm()">إلغاء التعديل</button>
+              </div>
+            </div>
+            <div class="card-body tight" x-show="classes.length">
+              <div class="table-wrap">
+                <table class="data">
+                  <thead><tr><th>الصف</th><th>المرحلة</th><th>الشعبة</th><th>السعة</th><th style="width:130px">إجراءات</th></tr></thead>
+                  <tbody>
+                    <template x-for="c in classes" :key="c.id">
+                      <tr>
+                        <td x-text="c.name"></td>
+                        <td class="num muted" x-text="c.grade_level ?? '—'"></td>
+                        <td class="muted" x-text="c.section || '—'"></td>
+                        <td class="num muted" x-text="c.capacity ?? '—'"></td>
+                        <td class="actions">
+                          <button class="btn btn-sm btn-icon" @click="editClass(c)"><svg><use href="#i-edit"></use></svg></button>
+                          <button class="btn btn-sm btn-danger btn-icon" @click="removeClass(c)"><svg><use href="#i-trash"></use></svg></button>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- المواد -->
+          <div class="card">
+            <div class="card-head"><h3>المواد</h3><span class="muted num" x-text="subjects.length + ' مادة'"></span></div>
+            <div class="card-body">
+              <div class="form-grid">
+                <div class="field"><label for="s-name">اسم المادة</label>
+                  <input id="s-name" type="text" x-model="subjectForm.name" placeholder="رياضيات"></div>
+                <div class="field"><label for="s-code">الرمز</label>
+                  <input id="s-code" type="text" x-model="subjectForm.code" placeholder="MATH"></div>
+                <div class="field"><label for="s-hours">الحصص الأسبوعية</label>
+                  <input id="s-hours" type="number" min="0" x-model="subjectForm.weekly_hours"></div>
+                <div class="field"><label for="s-color">اللون في الجدول</label>
+                  <input id="s-color" type="color" x-model="subjectForm.color"></div>
+              </div>
+              <div class="form-actions">
+                <button class="btn btn-primary" @click="saveSubject()" x-text="subjectForm.id ? 'حفظ التعديلات' : 'إضافة المادة'"></button>
+                <button class="btn" x-show="subjectForm.id" @click="resetSubjectForm()">إلغاء التعديل</button>
+              </div>
+            </div>
+            <div class="card-body tight" x-show="subjects.length">
+              <div class="table-wrap">
+                <table class="data">
+                  <thead><tr><th>المادة</th><th>الرمز</th><th>الحصص</th><th style="width:70px">اللون</th><th style="width:130px">إجراءات</th></tr></thead>
+                  <tbody>
+                    <template x-for="s in subjects" :key="s.id">
+                      <tr>
+                        <td x-text="s.name"></td>
+                        <td class="muted" x-text="s.code || '—'"></td>
+                        <td class="num muted" x-text="s.weekly_hours ?? 0"></td>
+                        <td><span style="display:inline-block;width:22px;height:14px;border-radius:4px"
+                                  :style="`background:${s.color}`"></span></td>
+                        <td class="actions">
+                          <button class="btn btn-sm btn-icon" @click="editSubject(s)"><svg><use href="#i-edit"></use></svg></button>
+                          <button class="btn btn-sm btn-danger btn-icon" @click="removeSubject(s)"><svg><use href="#i-trash"></use></svg></button>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- الحصص -->
+          <div class="card">
+            <div class="card-head"><h3>الحصص اليومية</h3><span class="muted num" x-text="periods.length + ' حصة'"></span></div>
+            <div class="card-body">
+              <div class="form-grid">
+                <div class="field"><label for="p-name">اسم الحصة</label>
+                  <input id="p-name" type="text" x-model="periodForm.name" placeholder="الحصة الأولى"></div>
+                <div class="field"><label for="p-start">من</label>
+                  <input id="p-start" type="time" x-model="periodForm.start_time"></div>
+                <div class="field"><label for="p-end">إلى</label>
+                  <input id="p-end" type="time" x-model="periodForm.end_time"></div>
+                <div class="field"><label for="p-order">الترتيب</label>
+                  <input id="p-order" type="number" min="1" x-model="periodForm.order_index"></div>
+                <div class="field">
+                  <label for="p-break">النوع</label>
+                  <label style="display:flex;align-items:center;gap:7px;font-size:13.5px">
+                    <input id="p-break" type="checkbox" x-model="periodForm.is_break" style="width:auto">
+                    استراحة وليست حصة دراسية
+                  </label>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button class="btn btn-primary" @click="savePeriod()" x-text="periodForm.id ? 'حفظ التعديلات' : 'إضافة الحصة'"></button>
+                <button class="btn" @click="resetPeriodForm()">تفريغ الحقول</button>
+              </div>
+            </div>
+            <div class="card-body tight" x-show="periods.length">
+              <div class="table-wrap">
+                <table class="data">
+                  <thead><tr><th style="width:60px">الترتيب</th><th>الحصة</th><th>من</th><th>إلى</th><th>النوع</th><th style="width:130px">إجراءات</th></tr></thead>
+                  <tbody>
+                    <template x-for="p in periods" :key="p.id">
+                      <tr>
+                        <td class="num muted" x-text="p.order_index"></td>
+                        <td x-text="p.name"></td>
+                        <td class="num" x-text="p.start_time"></td>
+                        <td class="num" x-text="p.end_time"></td>
+                        <td><span class="badge badge-outline" x-text="p.is_break ? 'استراحة' : 'حصة'"></span></td>
+                        <td class="actions">
+                          <button class="btn btn-sm btn-icon" @click="editPeriod(p)"><svg><use href="#i-edit"></use></svg></button>
+                          <button class="btn btn-sm btn-danger btn-icon" @click="removePeriod(p)"><svg><use href="#i-trash"></use></svg></button>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5.2 التكليفات -->
+        <div x-show="scheduleTab === 'assign'">
+          <div class="card">
+            <div class="card-head"><h3>تكليف معلمة بمادة في صف</h3></div>
+            <div class="card-body">
+              <div class="form-grid">
+                <div class="field"><label for="a-teacher">المعلمة</label>
+                  <select id="a-teacher" x-model="assignmentForm.teacher_id">
+                    <option value="">اختاري</option>
+                    <template x-for="t in activeTeachers" :key="t.id">
+                      <option :value="t.id" x-text="t.name"></option>
+                    </template>
+                  </select></div>
+                <div class="field"><label for="a-subject">المادة</label>
+                  <select id="a-subject" x-model="assignmentForm.subject_id">
+                    <option value="">اختاري</option>
+                    <template x-for="s in subjects" :key="s.id">
+                      <option :value="s.id" x-text="s.name"></option>
+                    </template>
+                  </select></div>
+                <div class="field"><label for="a-class">الصف</label>
+                  <select id="a-class" x-model="assignmentForm.class_id">
+                    <option value="">اختاري</option>
+                    <template x-for="c in classes" :key="c.id">
+                      <option :value="c.id" x-text="c.name"></option>
+                    </template>
+                  </select></div>
+                <div class="field"><label for="a-hours">النصاب الأسبوعي</label>
+                  <input id="a-hours" type="number" min="0" x-model="assignmentForm.weekly_hours"></div>
+                <div class="field full"><label for="a-notes">ملاحظات</label>
+                  <input id="a-notes" type="text" x-model="assignmentForm.notes"></div>
+              </div>
+              <div class="form-actions">
+                <button class="btn btn-primary" @click="saveAssignment()" x-text="assignmentForm.id ? 'حفظ التعديلات' : 'إضافة التكليف'"></button>
+                <button class="btn" x-show="assignmentForm.id" @click="resetAssignmentForm()">إلغاء التعديل</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>التكليفات الحالية</h3><span class="muted num" x-text="assignments.length + ' تكليف'"></span></div>
+            <div class="card-body tight">
+              <div class="table-wrap" x-show="assignments.length">
+                <table class="data">
+                  <thead><tr><th>المعلمة</th><th>المادة</th><th>الصف</th><th>النصاب</th><th>ملاحظات</th><th style="width:130px">إجراءات</th></tr></thead>
+                  <tbody>
+                    <template x-for="a in assignments" :key="a.id">
+                      <tr>
+                        <td x-text="a.teacher_name"></td>
+                        <td x-text="a.subject_name"></td>
+                        <td x-text="a.class_name"></td>
+                        <td class="num muted" x-text="a.weekly_hours ?? '—'"></td>
+                        <td class="muted" x-text="a.notes || ''"></td>
+                        <td class="actions">
+                          <button class="btn btn-sm btn-icon" @click="editAssignment(a)"><svg><use href="#i-edit"></use></svg></button>
+                          <button class="btn btn-sm btn-danger btn-icon" @click="removeAssignment(a)"><svg><use href="#i-trash"></use></svg></button>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              <div class="empty" x-show="!assignments.length">
+                <svg><use href="#i-empty"></use></svg>
+                <h4>لا توجد تكليفات بعد</h4>
+                <p>التكليف يربط المعلمة بمادة في صف، ويُستخدم لحساب النصاب.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5.3 بناء الجدول -->
+        <div x-show="scheduleTab === 'build'">
+          <div class="card">
+            <div class="card-head">
+              <h3>بناء جدول صف</h3>
+              <div class="toolbar">
+                <select x-model="builderClassId" @change="refreshBuilder()" style="width:auto;min-width:180px">
+                  <option value="">اختاري الصف</option>
+                  <template x-for="c in classes" :key="c.id">
+                    <option :value="c.id" x-text="c.name"></option>
+                  </template>
+                </select>
+              </div>
+            </div>
+            <div class="card-body" x-show="builderClassId">
+              <p class="muted">اضغطي على أي خلية لإسناد مادة ومعلمة. التعارضات تُمنع تلقائياً.</p>
+              <div class="table-wrap">
+                <table class="grid">
+                  <thead>
+                    <tr>
+                      <th class="period-col">الحصة</th>
+                      <template x-for="d in builderGrid.days" :key="d.value">
+                        <th x-text="d.label"></th>
+                      </template>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="p in builderGrid.periods" :key="p.id">
+                      <tr>
+                        <th class="period-col">
+                          <span x-text="p.name"></span>
+                          <small class="num" x-text="p.start_time + ' – ' + p.end_time"></small>
+                        </th>
+                        <template x-if="p.is_break">
+                          <td class="break-cell" :colspan="builderGrid.days.length">استراحة</td>
+                        </template>
+                        <template x-if="!p.is_break">
+                          <template x-for="d in builderGrid.days" :key="d.value">
+                            <td>
+                              <div class="grid-cell" :class="{ filled: !!cellAt(p.id, d.value) }"
+                                   :style="cellAt(p.id, d.value) && cellAt(p.id, d.value).subject_color
+                                            ? `--cell-color:${cellAt(p.id, d.value).subject_color}22`
+                                            : ''"
+                                   @click="openCell(p.id, d.value)">
+                                <template x-if="cellAt(p.id, d.value)">
+                                  <div>
+                                    <div class="subject" x-text="cellAt(p.id, d.value).subject_name || 'بدون مادة'"></div>
+                                    <div class="teacher" x-text="cellAt(p.id, d.value).teacher_name || 'بدون معلمة'"></div>
+                                  </div>
+                                </template>
+                                <template x-if="!cellAt(p.id, d.value)">
+                                  <span class="placeholder">+</span>
+                                </template>
+                              </div>
+                            </td>
+                          </template>
+                        </template>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="empty" x-show="!builderClassId">
+              <svg><use href="#i-schedule"></use></svg>
+              <h4>اختاري صفاً لبدء البناء</h4>
+              <p>أضيفي الصفوف والحصص من تبويب الإعداد أولاً.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5.4 عرض الجدول -->
+        <div x-show="scheduleTab === 'view'">
+          <div class="card">
+            <div class="card-head">
+              <h3>عرض الجدول</h3>
+              <div class="toolbar">
+                <select x-model="viewMode" @change="refreshView()" style="width:auto">
+                  <option value="class">حسب الصف</option>
+                  <option value="teacher">حسب المعلمة</option>
+                </select>
+                <select x-show="viewMode === 'class'" x-model="viewClassId" @change="refreshView()" style="width:auto;min-width:170px">
+                  <option value="">اختاري الصف</option>
+                  <template x-for="c in classes" :key="c.id">
+                    <option :value="c.id" x-text="c.name"></option>
+                  </template>
+                </select>
+                <select x-show="viewMode === 'teacher'" x-model="viewTeacherId" @change="refreshView()" style="width:auto;min-width:170px">
+                  <option value="">اختاري المعلمة</option>
+                  <template x-for="t in activeTeachers" :key="t.id">
+                    <option :value="t.id" x-text="t.name"></option>
+                  </template>
+                </select>
+                <button class="btn" @click="printSchedule()">
+                  <svg><use href="#i-print"></use></svg> تصدير PDF
+                </button>
+              </div>
+            </div>
+
+            <div class="card-body" x-show="viewGrid.periods.length">
+              <p class="muted" x-show="viewWorkload"
+                 x-text="viewWorkload ? `مجموع الحصص الأسبوعية: ${viewWorkload.totalHours}` : ''"></p>
+              <div class="table-wrap">
+                <table class="grid">
+                  <thead>
+                    <tr>
+                      <th class="period-col">الحصة</th>
+                      <template x-for="d in viewGrid.days" :key="d.value">
+                        <th x-text="d.label"></th>
+                      </template>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="p in viewGrid.periods" :key="p.id">
+                      <tr>
+                        <th class="period-col">
+                          <span x-text="p.name"></span>
+                          <small class="num" x-text="p.start_time + ' – ' + p.end_time"></small>
+                        </th>
+                        <template x-if="p.is_break">
+                          <td class="break-cell" :colspan="viewGrid.days.length">استراحة</td>
+                        </template>
+                        <template x-if="!p.is_break">
+                          <template x-for="d in viewGrid.days" :key="d.value">
+                            <td>
+                              <template x-if="viewCellAt(p.id, d.value)">
+                                <div>
+                                  <div class="subject" x-text="viewCellAt(p.id, d.value).subject_name || '—'"></div>
+                                  <div class="teacher"
+                                       x-text="viewMode === 'class'
+                                         ? (viewCellAt(p.id, d.value).teacher_name || '—')
+                                         : (viewCellAt(p.id, d.value).class_name || '—')"></div>
+                                </div>
+                              </template>
+                              <template x-if="!viewCellAt(p.id, d.value)">
+                                <span class="muted">—</span>
+                              </template>
+                            </td>
+                          </template>
+                        </template>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="empty" x-show="!viewGrid.periods.length">
+              <svg><use href="#i-schedule"></use></svg>
+              <h4>لا يوجد جدول لعرضه</h4>
+              <p>اختاري صفاً أو معلمة من الأعلى.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- 6. الزيارات                                                  -->
+      <!-- ============================================================ -->
+      <section x-show="tab === 'visits'">
+        <div class="page-head">
+          <div>
+            <h2>الزيارات الصفية</h2>
+            <p>سجّلي ملاحظات الزيارة ودرجة الأداء لكل معلمة.</p>
+          </div>
+          <div class="toolbar">
+            <button class="btn btn-primary" @click="openAddVisit()">
+              <svg><use href="#i-plus"></use></svg> إضافة زيارة
+            </button>
+            <button class="btn" @click="printVisits()">
+              <svg><use href="#i-print"></use></svg> تصدير PDF
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <div class="filters">
+              <div class="field">
+                <label for="v-teacher">المعلمة</label>
+                <select id="v-teacher" x-model="visitFilters.teacherId" @change="loadVisits()">
+                  <option value="">كل المعلمات</option>
+                  <template x-for="t in teachers" :key="t.id">
+                    <option :value="t.id" x-text="t.name"></option>
+                  </template>
+                </select>
+              </div>
+              <div class="field">
+                <label for="v-from">من</label>
+                <input id="v-from" type="text" class="num" x-model="visitFilters.from" @change="loadVisits()">
+              </div>
+              <div class="field">
+                <label for="v-to">إلى</label>
+                <input id="v-to" type="text" class="num" x-model="visitFilters.to" @change="loadVisits()">
+              </div>
+              <div class="field">
+                <label for="v-type">نوع الزيارة</label>
+                <select id="v-type" x-model="visitFilters.visitType" @change="loadVisits()">
+                  <option value="">كل الأنواع</option>
+                  <option value="مجدولة">مجدولة</option>
+                  <option value="مفاجئة">مفاجئة</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>&nbsp;</label>
+                <button class="btn" @click="clearVisitFilters()">مسح الفلاتر</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3>سجل الزيارات</h3>
+            <span class="muted num" x-text="visits.length + ' زيارة'"></span>
+          </div>
+          <div class="card-body tight">
+            <div class="table-wrap" x-show="visits.length">
+              <table class="data">
+                <thead>
+                  <tr>
+                    <th style="width:110px">التاريخ</th>
+                    <th>المعلمة</th>
+                    <th>الحصة</th>
+                    <th>الصف</th>
+                    <th style="width:80px">النوع</th>
+                    <th style="width:70px">الدرجة</th>
+                    <th>ملاحظة</th>
+                    <th style="width:120px">إجراءات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="v in visits" :key="v.id">
+                    <tr>
+                      <td class="num" x-text="formatDateKey(v.date_hijri)"></td>
+                      <td x-text="v.teacher_name"></td>
+                      <td class="muted" x-text="v.period_name || '—'"></td>
+                      <td class="muted" x-text="v.class_name || '—'"></td>
+                      <td><span class="badge badge-outline" x-text="v.visit_type || '—'"></span></td>
+                      <td class="num" x-text="v.score ?? '—'"></td>
+                      <td class="muted" x-text="v.notes || v.recommendations || ''"></td>
+                      <td class="actions">
+                        <button class="btn btn-sm btn-icon" @click="openEditVisit(v)"><svg><use href="#i-edit"></use></svg></button>
+                        <button class="btn btn-sm btn-danger btn-icon" @click="removeVisit(v)"><svg><use href="#i-trash"></use></svg></button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div class="empty" x-show="!visits.length">
+              <svg><use href="#i-visits"></use></svg>
+              <h4>لا توجد زيارات مسجّلة</h4>
+              <p>سجّلي أول زيارة صفية لمتابعة أداء المعلمات.</p>
+              <button class="btn btn-primary" @click="openAddVisit()">إضافة زيارة</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- 7. الإعدادات                                                 -->
+      <!-- ============================================================ -->
+      <section x-show="tab === 'settings'">
+        <div class="page-head">
+          <div>
+            <h2>الإعدادات</h2>
+            <p>خصّصي المظهر واحفظي نسخة احتياطية من بياناتك.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h3>الألوان</h3></div>
+          <div class="card-body">
+            <div class="theme-row">
+              <label for="t-primary">اللون الأساسي</label>
+              <span class="hex num" x-text="themeForm.primary"></span>
+              <input id="t-primary" type="color" x-model="themeForm.primary" @input="previewTheme()">
+            </div>
+            <div class="theme-row">
+              <label for="t-bg">خلفية الصفحة</label>
+              <span class="hex num" x-text="themeForm.bg"></span>
+              <input id="t-bg" type="color" x-model="themeForm.bg" @input="previewTheme()">
+            </div>
+            <div class="theme-row">
+              <label for="t-text">لون النص</label>
+              <span class="hex num" x-text="themeForm.text"></span>
+              <input id="t-text" type="color" x-model="themeForm.text" @input="previewTheme()">
+            </div>
+            <div class="theme-row">
+              <label for="t-sidebar">خلفية الشريط الجانبي</label>
+              <span class="hex num" x-text="themeForm.sidebar"></span>
+              <input id="t-sidebar" type="color" x-model="themeForm.sidebar" @input="previewTheme()">
+            </div>
+            <div class="theme-row">
+              <label for="t-sidebar-text">نص الشريط الجانبي</label>
+              <span class="hex num" x-text="themeForm.sidebarText"></span>
+              <input id="t-sidebar-text" type="color" x-model="themeForm.sidebarText" @input="previewTheme()">
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h3>الخط والحواف</h3></div>
+          <div class="card-body">
+            <div class="form-grid">
+              <div class="field">
+                <label for="t-font">نوع الخط</label>
+                <select id="t-font" x-model="themeForm.font" @change="previewTheme()">
+                  <template x-for="f in fonts" :key="f.label">
+                    <option :value="f.value" x-text="f.label"></option>
+                  </template>
+                </select>
+              </div>
+              <div class="field">
+                <label for="t-radius" x-text="`نصف قطر الحواف: ${themeForm.radius}px`"></label>
+                <input id="t-radius" type="range" min="0" max="30" x-model.number="themeForm.radius" @input="previewTheme()">
+              </div>
+              <div class="field" x-show="umalquraSupported">
+                <label for="t-calendar">حساب التقويم الهجري</label>
+                <select id="t-calendar" x-model="calendarMode" @change="changeCalendarMode()">
+                  <option value="tabular">حسابي (Tabular)</option>
+                  <option value="umalqura">أم القرى</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" @click="saveThemeSettings()">حفظ التخصيص</button>
+              <button class="btn" @click="resetThemeSettings()">استعادة الافتراضي</button>
+              <button class="btn" @click="exportThemeSettings()">تصدير الإعدادات</button>
+              <button class="btn" @click="triggerThemeImport()">استيراد الإعدادات</button>
+              <input type="file" x-ref="themeFile" accept=".json,application/json" class="hidden" @change="onThemeFile($event)">
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h3>النسخ الاحتياطي</h3></div>
+          <div class="card-body">
+            <p class="muted">البيانات محفوظة داخل هذا المتصفح فقط. صدّري نسخة بانتظام، خاصة قبل تفريغ بيانات المتصفح.</p>
+            <div class="form-actions">
+              <button class="btn btn-primary" @click="backupAll()">
+                <svg><use href="#i-download"></use></svg> تصدير كل البيانات
+              </button>
+              <button class="btn" @click="triggerRestore()">
+                <svg><use href="#i-upload"></use></svg> استيراد نسخة احتياطية
+              </button>
+              <input type="file" x-ref="backupFile" accept=".json,application/json" class="hidden" @change="onBackupFile($event)">
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h3>معلومات النظام</h3></div>
+          <div class="card-body">
+            <div class="info-list">
+              <div><span>المعلمات النشطات</span><strong x-text="systemInfo.teachers"></strong></div>
+              <div><span>إجمالي المعلمات</span><strong x-text="systemInfo.teachersAll"></strong></div>
+              <div><span>السجلات في فهرس البحث</span><strong x-text="systemInfo.indexSize"></strong></div>
+              <div><span>سجلات الحضور</span><strong x-text="systemInfo.attendance"></strong></div>
+              <div><span>الزيارات الصفية</span><strong x-text="systemInfo.visits"></strong></div>
+              <div><span>التقويم المستخدم</span><strong x-text="calendarMode === 'umalqura' ? 'أم القرى' : 'حسابي'"></strong></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ================= نافذة المعلمة ================= -->
+  <div class="modal-backdrop" x-show="teacherModal" @click.self="teacherModal = false"
+       @keydown.escape.window="teacherModal = false">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 x-text="editingId ? 'تعديل بيانات المعلمة' : 'إضافة معلمة'"></h3>
+        <button class="btn btn-ghost btn-icon" @click="teacherModal = false"><svg><use href="#i-close"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="field"><label for="tf-name">الاسم</label>
+            <input id="tf-name" type="text" x-model="teacherForm.name" placeholder="الاسم الكامل"></div>
+          <div class="field"><label for="tf-spec">التخصص</label>
+            <input id="tf-spec" type="text" x-model="teacherForm.specialty" placeholder="رياضيات"></div>
+          <div class="field"><label for="tf-phone">الهاتف</label>
+            <input id="tf-phone" type="tel" class="num" x-model="teacherForm.phone" placeholder="05xxxxxxxx"></div>
+          <div class="field"><label for="tf-email">البريد الإلكتروني</label>
+            <input id="tf-email" type="email" x-model="teacherForm.email"></div>
+          <div class="field"><label for="tf-hire">تاريخ التعيين</label>
+            <input id="tf-hire" type="date" x-model="teacherForm.hire_date"></div>
+          <div class="field" x-show="editingId">
+            <label for="tf-active">حالة المعلمة</label>
+            <select id="tf-active" x-model="teacherForm.is_active">
+              <option :value="true">نشطة</option>
+              <option :value="false">معطّلة</option>
             </select>
-          </label>
-          <label>
-            <span>نصف قطر الحواف (بكسل)</span>
-            <input type="number" min="0" max="30"
-                   x-model.number="theme.radius"
-                   @input="applyTheme()"
-                   style="width:80px;">
-          </label>
-        </div>
-
-        <div class="settings-panel" style="margin-top:20px;">
-          <div class="toolbar">
-            <button @click="saveTheme()">حفظ التخصيص</button>
-            <button class="btn-secondary" @click="resetTheme()">استعادة الافتراضي</button>
-            <button class="btn-secondary" @click="exportTheme()">تصدير الإعدادات</button>
-            <button class="btn-secondary" @click="importTheme()">استيراد الإعدادات</button>
           </div>
+          <div class="field full"><label for="tf-notes">ملاحظات</label>
+            <textarea id="tf-notes" x-model="teacherForm.notes"></textarea></div>
         </div>
-
-        <div class="settings-panel" style="margin-top:20px;">
-          <h3>النسخ الاحتياطي للبيانات</h3>
-          <div class="toolbar">
-            <button @click="exportData('json')">تصدير كل البيانات</button>
-            <button @click="importBackup()">استيراد نسخة احتياطية</button>
-          </div>
-        </div>
-
-        <div class="settings-panel" style="margin-top:20px;">
-          <h3>معلومات النظام</h3>
-          <label>
-            <span>عدد المعلمات النشطات</span>
-            <span x-text="stats.total" style="font-weight:600;"></span>
-          </label>
-          <label>
-            <span>عدد السجلات في الفهرس</span>
-            <span x-text="stats.indexed" style="font-weight:600;"></span>
-          </label>
+        <div class="form-actions">
+          <button class="btn btn-primary" @click="saveTeacher()" x-text="editingId ? 'حفظ التعديلات' : 'إضافة المعلمة'"></button>
+          <button class="btn" @click="teacherModal = false">إلغاء</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ================= نافذة خلية الجدول ================= -->
+  <div class="modal-backdrop" x-show="cellModal" @click.self="cellModal = false"
+       @keydown.escape.window="cellModal = false">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 x-text="cellForm.day !== null ? `حصة ${dayName(cellForm.day)}` : 'إسناد حصة'"></h3>
+        <button class="btn btn-ghost btn-icon" @click="cellModal = false"><svg><use href="#i-close"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-danger" x-show="cellWarning">
+          <svg><use href="#i-alert"></use></svg>
+          <span class="grow" x-text="cellWarning"></span>
+        </div>
+        <div class="form-grid">
+          <div class="field"><label for="cf-subject">المادة</label>
+            <select id="cf-subject" x-model="cellForm.subject_id">
+              <option value="">بدون مادة</option>
+              <template x-for="s in subjects" :key="s.id">
+                <option :value="s.id" x-text="s.name"></option>
+              </template>
+            </select></div>
+          <div class="field"><label for="cf-teacher">المعلمة</label>
+            <select id="cf-teacher" x-model="cellForm.teacher_id">
+              <option value="">بدون معلمة</option>
+              <template x-for="t in activeTeachers" :key="t.id">
+                <option :value="t.id" x-text="t.name"></option>
+              </template>
+            </select></div>
+          <div class="field"><label for="cf-room">القاعة</label>
+            <input id="cf-room" type="text" x-model="cellForm.room"></div>
+          <div class="field full"><label for="cf-notes">ملاحظات</label>
+            <input id="cf-notes" type="text" x-model="cellForm.notes"></div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" @click="saveCell()">حفظ الحصة</button>
+          <button class="btn btn-danger" @click="clearCell()">إفراغ الخلية</button>
+          <button class="btn" @click="cellModal = false">إلغاء</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= نافذة الزيارة ================= -->
+  <div class="modal-backdrop" x-show="visitModal" @click.self="visitModal = false"
+       @keydown.escape.window="visitModal = false">
+    <div class="modal wide">
+      <div class="modal-head">
+        <h3 x-text="visitForm.id ? 'تعديل الزيارة' : 'زيارة صفية جديدة'"></h3>
+        <button class="btn btn-ghost btn-icon" @click="visitModal = false"><svg><use href="#i-close"></use></svg></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="field"><label for="vf-teacher">المعلمة</label>
+            <select id="vf-teacher" x-model="visitForm.teacher_id">
+              <option value="">اختاري</option>
+              <template x-for="t in activeTeachers" :key="t.id">
+                <option :value="t.id" x-text="t.name"></option>
+              </template>
+            </select></div>
+          <div class="field"><label for="vf-date">التاريخ الهجري</label>
+            <input id="vf-date" type="text" class="num" x-model="visitForm.date_hijri" placeholder="1447-09-15"></div>
+          <div class="field"><label for="vf-period">الحصة</label>
+            <select id="vf-period" x-model="visitForm.period_id">
+              <option value="">بدون تحديد</option>
+              <template x-for="p in teachingPeriods" :key="p.id">
+                <option :value="p.id" x-text="p.name"></option>
+              </template>
+            </select></div>
+          <div class="field"><label for="vf-class">الصف</label>
+            <select id="vf-class" x-model="visitForm.class_id">
+              <option value="">بدون تحديد</option>
+              <template x-for="c in classes" :key="c.id">
+                <option :value="c.id" x-text="c.name"></option>
+              </template>
+            </select></div>
+          <div class="field"><label for="vf-type">نوع الزيارة</label>
+            <select id="vf-type" x-model="visitForm.visit_type">
+              <option value="مجدولة">مجدولة</option>
+              <option value="مفاجئة">مفاجئة</option>
+            </select></div>
+          <div class="field"><label for="vf-score">الدرجة (0 – 100)</label>
+            <input id="vf-score" type="number" min="0" max="100" x-model="visitForm.score"></div>
+          <div class="field full"><label for="vf-strengths">نقاط القوة</label>
+            <textarea id="vf-strengths" x-model="visitForm.strengths"></textarea></div>
+          <div class="field full"><label for="vf-improve">نقاط التحسين</label>
+            <textarea id="vf-improve" x-model="visitForm.improvements"></textarea></div>
+          <div class="field full"><label for="vf-rec">التوصيات</label>
+            <textarea id="vf-rec" x-model="visitForm.recommendations"></textarea></div>
+          <div class="field full"><label for="vf-notes">ملاحظات عامة</label>
+            <textarea id="vf-notes" x-model="visitForm.notes"></textarea></div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" @click="saveVisit()" x-text="visitForm.id ? 'حفظ التعديلات' : 'حفظ الزيارة'"></button>
+          <button class="btn" @click="visitModal = false">إلغاء</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= التنبيهات ================= -->
+  <div class="toast-stack">
+    <template x-for="t in toasts" :key="t.id">
+      <div class="toast" :class="t.type" x-text="t.message"></div>
     </template>
+  </div>
 
-  </main>
+</div>
 
-  <!-- ============ Toast ============ -->
-  <template x-if="toast">
-    <div class="toast" x-text="toast"></div>
-  </template>
-
-  <!-- Alpine.js يُحمَّل ديناميكياً من داخل app.js -->
-  <script type="module" src="js/app.js"></script>
-
+<script type="module" src="./js/app.js"></script>
 </body>
 </html>
